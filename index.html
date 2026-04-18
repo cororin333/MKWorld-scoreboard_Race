@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MKWorld即時集計表</title>
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="header">
+      <div class="titleRow">
+        <h1 class="title">MKWorld即時集計表</h1>
+        <button id="btnSpec" class="pill">サイト仕様書</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="card">
+        <div class="cardHead">
+          <div class="cardTitle">ルール設定</div>
+        </div>
+        <div class="ruleGrid">
+          <div class="ruleCol">
+            <div class="ruleLine">
+              <span class="label">対戦人数</span>
+              <label class="radio"><input type="radio" name="players" value="12">12人制</label>
+              <label class="radio"><input type="radio" name="players" value="24" checked>24人制</label>
+            </div>
+            <div class="ruleLine">
+              <span class="label">対戦形式</span>
+              <select id="selMode" class="sel"></select>
+            </div>
+            <div class="ruleLine">
+              <span class="label">レース数</span>
+              <label class="radio"><input type="radio" name="races" value="8">8</label>
+              <label class="radio"><input type="radio" name="races" value="12" checked>12</label>
+            </div>
+          </div>
+
+          <div class="ruleCol">
+            <div class="ruleLine">
+              <span class="label">通過組数</span>
+              <input id="inpQualify" class="inp small" inputmode="numeric" autocomplete="off" tabindex="-1" />
+            </div>
+            <div class="ruleLine">
+              <span class="label">CPU加算</span>
+              <div class="cpuBox">
+                <label class="radio"><input type="radio" name="cpuCalc" value="MKB" checked>MKBルール</label>
+                <label class="radio"><input type="radio" name="cpuCalc" value="SUMMIT">SUMMITルール</label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="cardHead">
+          <div class="cardTitleRow">
+            <div class="cardTitle">タグ設定</div>
+            <span id="dupKeyMsg" class="errInline" aria-live="polite"></span>
+          </div>
+          <div class="cardActions">
+            <button id="btnResetTags" class="btn">Reset Tags</button>
+          </div>
+        </div>
+
+        <div class="tagWrap">
+          <div class="tagTableWrap">
+            <div id="tagTables" class="tagTables" aria-label="タグ設定"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="cardHead">
+          <div class="cardTitleRow">
+            <div class="cardTitle">順位入力</div>
+            <button id="btnPin" class="btn">タグ固定</button>
+          </div>
+          <div class="cardActions">
+            <button id="btnResetAll" class="btn">Reset</button>
+          </div>
+        </div>
+
+        <div class="pinRow">
+          <div id="pinPreview" class="pinPreview" aria-label="タグ見本"></div>
+        </div>
+
+        <div class="smallLine smallLineTight">
+          <span>1レース最大点差：<span id="spMaxDiff">--</span>点</span>
+        </div>
+
+        <div id="rankWrap" class="rankWrap"></div>
+      </section>
+
+      <section class="card cardLast">
+        <div class="cardHead">
+          <div class="cardTitleRow">
+            <div class="cardTitle">集計結果</div>
+            <span id="copyStatusMsg" class="copyStatusMsg" aria-live="polite"></span>
+          </div>
+          <div class="cardActions">
+            <button id="btnCopyMain" class="btn">copy</button>
+          </div>
+        </div>
+
+        <div class="copyLine">
+          <div id="outMain" class="outLine outWrap" title="コピペ用"></div>
+        </div>
+
+        <div class="optionRow">
+          <div class="optTitle">表示オプション</div>
+          <div class="displayOptionBlock">
+            <div class="displayOptionLine">
+              <label class="radio"><input type="radio" name="dispMode" value="normal" checked>点差のみ</label>
+              <label class="chk"><input id="chkShowSum" type="checkbox">合計点</label>
+              <label class="chk"><input id="chkShowCert" type="checkbox">勝ち確表示</label>
+              <span id="certText" class="certText"></span>
+            </div>
+            <div class="displayOptionLine">
+              <label class="radio"><input type="radio" name="dispMode" value="sumOnly">合計点のみ(順位計算なし)</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="optionRow">
+          <div class="optTitle">集計オプション</div>
+          <button id="btnCopyOpt" class="btn">copy</button>
+          <select id="selView" class="sel"></select>
+        </div>
+
+        <div class="copyLine">
+          <div id="outOpt" class="outLine outWrap"></div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="logBlock">
+          <div class="logTitle">点数補正ログ</div>
+          <div id="logAdj" class="log"></div>
+        </div>
+
+        <div class="logBlock">
+          <div class="logTitle">コース選択ログ</div>
+          <label class="chk small"><input id="chkShowCourseLog" type="checkbox">表示</label>
+          <div id="logCourse" class="log"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="pinBar" class="pinBar hidden" aria-hidden="true">
+    <div class="pinBarInner">
+      <div id="pinBarContent" class="pinBarContent"></div>
+      <button id="btnPinClose" class="pinClose" aria-label="閉じる">×</button>
+    </div>
+  </div>
+
+  <div id="modalSpec" class="modal hidden" aria-hidden="true">
+    <div class="modalBack"></div>
+    <div class="modalBox">
+      <div class="modalHead">
+        <div class="modalTitle">サイト仕様書</div>
+        <button id="btnSpecClose" class="pinClose" aria-label="閉じる">×</button>
+      </div>
+      <div class="modalBody">
+        <div class="specText">
+          ※このページは検索避け（noindex/robots）設定済みです。<br>
+          本ツールはローカル保存（localStorage）で動作します。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
