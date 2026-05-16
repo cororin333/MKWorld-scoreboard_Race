@@ -1,16 +1,17 @@
 (()=> {
   'use strict';
 
-  const VERSION = 'mkworld_8_12_fixed_20260412';
+  const VERSION = 'mkworld_recovery_storage_20260509';
   const LS_KEY = 'mkworld:' + location.pathname;
   const MAX_TEAMS = 24;
+  const FINISHED_TTL_MS = 24 * 60 * 60 * 1000;
 
   const SELECT_COLORS = [
-    {name:'未選択', color:''},
-    {name:'🔴赤', color:'#FE3C4F'},
-    {name:'🔵青', color:'#498CF0'},
-    {name:'🟡黄', color:'#FFF200'},
-    {name:'🟢緑', color:'#57C544'},
+    {name:'未選択', display:'', color:''},
+    {name:'🔴赤', display:'🔴', color:'#FE3C4F'},
+    {name:'🔵青', display:'🔵', color:'#498CF0'},
+    {name:'🟡黄', display:'🟡', color:'#FFF200'},
+    {name:'🟢緑', display:'🟢', color:'#57C544'},
   ];
 
   const AUTO_COLORS = [
@@ -54,6 +55,7 @@
   const dupKeyMsg = $('#dupKeyMsg');
   const tagTables = $('#tagTables');
   const btnResetAll = $('#btnResetAll');
+  const btnRecovery = $('#btnRecovery');
   const btnPin = $('#btnPin');
   const pinPreview = $('#pinPreview');
   const pinBar = $('#pinBar');
@@ -68,7 +70,6 @@
   const copyStatusMsg = $('#copyStatusMsg');
   const chkShowSum = $('#chkShowSum');
   const chkShowCert = $('#chkShowCert');
-  const certText = $('#certText');
   const selView = $('#selView');
   const logAdj = $('#logAdj');
   const logCourse = $('#logCourse');
@@ -79,6 +80,9 @@
 
   let composingQualify = false;
   let saveTimer = null;
+  let copyStatusTimer = null;
+  let suppressNewRaceCheck = false;
+  let lastMainText = '';
 
   const state = {
     players: 24,
@@ -93,13 +97,15 @@
     courses: {},
     locks: {},
     adjLog: [],
-    adjSnapshots: {},
     showSum: false,
     showCert: true,
     optViewTeam: 'none',
     showCourseLog: false,
     dispMode: 'normal',
     lastUpdated: 0,
+    finishedAt: null,
+    recoverySnapshot: null,
+    recoveryAvailable: false,
     autosaveOff: false,
   };
 
@@ -107,7 +113,7 @@
   function clamp(n,min,max){ return Math.max(min, Math.min(max,n)); }
   function fmt(){ return FORMATS[state.players].find(x=>x.id === state.mode) || FORMATS[state.players][0]; }
   function teamCount(){ return fmt().teamCount; }
-  function visibleIndexes(){ return Array.from({length: teamCount()}, (_,i)=> i); }
+  function visibleIndexes(){ return Array.from({length:teamCount()}, (_,i)=> i); }
   function hasColorSelect(count = teamCount()){ return count <= 4; }
   function teamAutoColor(i){ return AUTO_COLORS[i % AUTO_COLORS.length]; }
   function getPoints(){ return state.players === 12 ? POINTS_12 : POINTS_24; }
@@ -142,10 +148,62 @@
 
   function ensureTeams(){
     while(state.teams.length < MAX_TEAMS){
-      state.teams.push({ id: String(state.teams.length), name:'', key:'', color:'', adj:'' });
+      state.teams.push({id:String(state.teams.length), name:'', key:'', color:'', adj:''});
     }
     if(state.teams.length > MAX_TEAMS) state.teams.length = MAX_TEAMS;
-    state.teams.forEach((t,i)=>{ if(t.id == null) t.id = String(i); });
+    state.teams.forEach((t,i)=>{
+      if(t.id == null) t.id = String(i);
+      if(t.name == null) t.name = '';
+      if(t.key == null) t.key = '';
+      if(t.color == null) t.color = '';
+      if(t.adj == null) t.adj = '';
+    });
+  }
+
+  function snapshotResetData(){
+    ensureTeams();
+    return {
+      cells: structuredCloneSafe(state.cells),
+      courses: structuredCloneSafe(state.courses),
+      locks: structuredCloneSafe(state.locks),
+      teamsAdj: state.teams.map(t=> t.adj || ''),
+      adjLog: structuredCloneSafe(state.adjLog),
+      outMain: outMain.textContent || '',
+      outOpt: outOpt.textContent || '',
+      finishedAt: state.finishedAt,
+    };
+  }
+
+  function structuredCloneSafe(v){
+    return JSON.parse(JSON.stringify(v ?? null));
+  }
+
+  function makeSaveObject(){
+    ensureTeams();
+    return {
+      version: VERSION,
+      lastUpdated: state.lastUpdated,
+      players: state.players,
+      races: state.races,
+      mode: state.mode,
+      qualify: state.qualify,
+      cpuCalc: state.cpuCalc,
+      teams: state.teams.map(t=>({id:t.id,name:t.name,key:t.key,color:t.color,adj:t.adj})),
+      cpuKey: state.cpuKey,
+      selfTeamIndex: state.selfTeamIndex,
+      cells: state.cells,
+      courses: state.courses,
+      locks: state.locks,
+      adjLog: state.adjLog,
+      showSum: state.showSum,
+      showCert: state.showCert,
+      optViewTeam: state.optViewTeam,
+      showCourseLog: state.showCourseLog,
+      dispMode: state.dispMode,
+      finishedAt: state.finishedAt,
+      recoverySnapshot: state.recoverySnapshot,
+      recoveryAvailable: state.recoveryAvailable,
+    };
   }
 
   function scheduleSave(){
@@ -159,31 +217,14 @@
     saveTimer = null;
     if(state.autosaveOff) return;
     try{
-      localStorage.setItem(LS_KEY, JSON.stringify({
-        version: VERSION,
-        lastUpdated: state.lastUpdated,
-        players: state.players,
-        races: state.races,
-        mode: state.mode,
-        qualify: state.qualify,
-        cpuCalc: state.cpuCalc,
-        teams: state.teams.map(t=>({name:t.name,key:t.key,color:t.color,adj:t.adj,id:t.id})),
-        cpuKey: state.cpuKey,
-        selfTeamIndex: state.selfTeamIndex,
-        cells: state.cells,
-        courses: state.courses,
-        locks: state.locks,
-        adjLog: state.adjLog,
-        adjSnapshots: state.adjSnapshots,
-        showSum: state.showSum,
-        showCert: state.showCert,
-        optViewTeam: state.optViewTeam,
-        showCourseLog: state.showCourseLog,
-        dispMode: state.dispMode,
-      }));
+      localStorage.setItem(LS_KEY, JSON.stringify(makeSaveObject()));
     }catch(_e){
       state.autosaveOff = true;
     }
+  }
+
+  function clearStorageOnly(){
+    try{ localStorage.removeItem(LS_KEY); }catch(_e){}
   }
 
   function loadSaved(){
@@ -192,36 +233,40 @@
       const raw = localStorage.getItem(LS_KEY);
       if(!raw) return false;
       const obj = JSON.parse(raw);
-      if(!obj) return false;
-
-      state.players = obj.players ?? state.players;
-      state.races = obj.races ?? state.races;
+      if(!obj || typeof obj !== 'object') return false;
+      if(obj.finishedAt && nowMs() - Number(obj.finishedAt) >= FINISHED_TTL_MS){
+        clearStorageOnly();
+        return false;
+      }
+      state.players = FORMATS[obj.players] ? Number(obj.players) : state.players;
+      state.races = Number(obj.races) === 8 || Number(obj.races) === 12 ? Number(obj.races) : state.races;
       state.mode = obj.mode ?? state.mode;
-      state.qualify = obj.qualify ?? '';
-      state.cpuCalc = obj.cpuCalc ?? 'MKB';
-      state.cpuKey = obj.cpuKey ?? '';
+      if(!FORMATS[state.players].some(x=> x.id === state.mode)) state.mode = FORMATS[state.players][0].id;
+      state.qualify = sanitizeIntInput(obj.qualify ?? '');
+      state.cpuCalc = obj.cpuCalc === 'SUMMIT' ? 'SUMMIT' : 'MKB';
+      state.cpuKey = normalizeKey(obj.cpuKey ?? '');
       state.selfTeamIndex = String(obj.selfTeamIndex ?? '0');
-      state.cells = obj.cells ?? {};
-      state.courses = obj.courses ?? {};
-      state.locks = obj.locks ?? {};
+      state.cells = obj.cells && typeof obj.cells === 'object' ? obj.cells : {};
+      state.courses = obj.courses && typeof obj.courses === 'object' ? obj.courses : {};
+      state.locks = obj.locks && typeof obj.locks === 'object' ? obj.locks : {};
       state.adjLog = Array.isArray(obj.adjLog) ? obj.adjLog : [];
-      state.adjSnapshots = obj.adjSnapshots && typeof obj.adjSnapshots === 'object' ? obj.adjSnapshots : {};
       state.showSum = !!obj.showSum;
       state.showCert = obj.showCert !== false;
       state.optViewTeam = obj.optViewTeam ?? 'none';
       state.showCourseLog = !!obj.showCourseLog;
-      state.dispMode = obj.dispMode ?? 'normal';
-      if(state.dispMode !== 'normal' && state.dispMode !== 'sumOnly') state.dispMode = 'normal';
-      state.lastUpdated = obj.lastUpdated ?? 0;
-
+      state.dispMode = obj.dispMode === 'sumOnly' ? 'sumOnly' : 'normal';
+      state.lastUpdated = Number(obj.lastUpdated) || 0;
+      state.finishedAt = obj.finishedAt ? Number(obj.finishedAt) : null;
+      state.recoverySnapshot = obj.recoverySnapshot || null;
+      state.recoveryAvailable = !!obj.recoveryAvailable && !!state.recoverySnapshot;
       const srcTeams = Array.isArray(obj.teams) ? obj.teams : [];
       ensureTeams();
       for(let i=0;i<MAX_TEAMS;i++){
         const src = srcTeams[i] || {};
-        state.teams[i].name = src.name ?? '';
-        state.teams[i].key = src.key ?? '';
-        state.teams[i].color = src.color ?? '';
-        state.teams[i].adj = src.adj ?? '';
+        state.teams[i].name = String(src.name ?? '');
+        state.teams[i].key = normalizeKey(src.key ?? '');
+        state.teams[i].color = SELECT_COLORS.some(c=> c.color === src.color) ? src.color : '';
+        state.teams[i].adj = sanitizeIntInput(src.adj ?? '');
       }
       return true;
     }catch(_e){
@@ -230,12 +275,12 @@
   }
 
   function getTeamName(i){
-    const nm = (state.teams[i]?.name ?? '').trim();
+    const nm = String(state.teams[i]?.name ?? '').trim();
     return nm || `チーム${i+1}`;
   }
 
-  function longLabel(text){
-    return shouldLeftAlignLabel(text);
+  function shouldLeftAlignLabel(text){
+    return String(text ?? '').trim().length >= 6;
   }
 
   function buildModeOptions(){
@@ -282,9 +327,7 @@
 
   function ensureSelections(){
     if(!hasColorSelect()) state.selfTeamIndex = '0';
-    const mainIdx = currentMainBaseIdx();
-    state.selfTeamIndex = String(mainIdx);
-
+    state.selfTeamIndex = String(currentMainBaseIdx());
     if(state.optViewTeam !== 'none'){
       const n = Number(state.optViewTeam);
       if(!Number.isFinite(n) || n < 0 || n >= teamCount()) state.optViewTeam = 'none';
@@ -293,10 +336,7 @@
 
   function splitTeamIndexes(count){
     if(count <= 12) return [Array.from({length:count}, (_,i)=> i)];
-    return [
-      Array.from({length:12}, (_,i)=> i),
-      Array.from({length:count - 12}, (_,i)=> i + 12),
-    ];
+    return [Array.from({length:12}, (_,i)=> i), Array.from({length:count - 12}, (_,i)=> i + 12)];
   }
 
   function tagBoundarySize(){
@@ -313,32 +353,12 @@
 
   function autoAlignInput(inp){
     requestAnimationFrame(()=>{
-      const left = inp.scrollWidth > inp.clientWidth + 1;
-      inp.classList.toggle('left', left);
+      inp.classList.toggle('left', inp.scrollWidth > inp.clientWidth + 1);
     });
   }
 
-  function shouldLeftAlignLabel(text){
-    return String(text ?? '').trim().length >= 6;
-  }
-
-  function pinLayoutRule(){
-    const key = `${state.players}:${state.mode}`;
-    const map = {
-      '12:FFA': {rows:2, groups:[3,3,3,3]},
-      '12:2v2': {rows:1, groups:[3,3]},
-      '12:3v3': {rows:1, groups:[4]},
-      '12:4v4': {rows:1, groups:[3]},
-      '12:6v6': {rows:1, groups:[2]},
-      '24:FFA': {rows:2, groups:[6,6,6,6]},
-      '24:2v2': {rows:2, groups:[3,3,3,3]},
-      '24:3v3': {rows:1, groups:[4,4]},
-      '24:4v4': {rows:1, groups:[3,3]},
-      '24:6v6': {rows:1, groups:[4]},
-      '24:8v8': {rows:1, groups:[3]},
-      '24:12v12': {rows:1, groups:[2]},
-    };
-    return map[key] || {rows:1, groups:[teamCount()]};
+  function colorDisplay(color){
+    return SELECT_COLORS.find(c=> c.color === color)?.display || '';
   }
 
   function buildTagTables(){
@@ -346,10 +366,8 @@
     tagTables.innerHTML = '';
     const count = teamCount();
     const colorOn = hasColorSelect(count);
-
     const row = document.createElement('div');
     row.className = 'tagMainRow';
-
     const left = document.createElement('div');
     left.className = 'tagTablesCol';
 
@@ -383,8 +401,7 @@
             inp.addEventListener('input', ()=>{
               state.teams[i].name = inp.value;
               autoAlignInput(inp);
-              buildOptViewOptions();
-              refreshAfterTagChange();
+              refreshTagOnly();
             });
             td.appendChild(inp);
             autoAlignInput(inp);
@@ -398,12 +415,15 @@
               const opt = document.createElement('option');
               opt.value = c.color;
               opt.textContent = c.name;
+              opt.dataset.short = c.display;
               sel.appendChild(opt);
             }
             sel.value = state.teams[i].color || '';
+            setColorSelectShort(sel);
             sel.addEventListener('change', ()=>{
               state.teams[i].color = sel.value;
-              refreshAfterTagChange();
+              setColorSelectShort(sel);
+              refreshTagOnly();
             });
             td.appendChild(sel);
           }
@@ -415,10 +435,11 @@
             radio.type = 'radio';
             radio.name = 'mainBaseTeam';
             radio.value = String(i);
+            radio.tabIndex = -1;
             radio.checked = String(i) === String(currentMainBaseIdx());
-            radio.addEventListener('change', ()=>{
+            radio.addEventListener('change', async ()=>{
               state.selfTeamIndex = String(i);
-              recalcAll(true).then(ok=>{ if(ok) recalcOptIfNeeded(true); });
+              await runCalcByCurrentValidState(false);
               scheduleSave();
             });
             label.appendChild(radio);
@@ -435,8 +456,7 @@
               const v = normalizeKey(inp.value);
               if(inp.value !== v) inp.value = v;
               state.teams[i].key = v;
-              buildOptViewOptions();
-              refreshAfterTagChange();
+              refreshTagOnly();
             });
             td.appendChild(inp);
           }
@@ -448,13 +468,16 @@
             inp.autocomplete = 'off';
             inp.inputMode = 'numeric';
             inp.value = state.teams[i].adj || '';
-            const commit = ()=>{
+            const commit = async ()=>{
               const prev = sanitizeIntInput(state.teams[i].adj);
               const v = sanitizeIntInput(inp.value);
               if(inp.value !== v) inp.value = v;
+              if(prev === v) return;
+              checkNewRaceInputAfterFinish();
               state.teams[i].adj = v;
-              if(prev !== v) updateAdjLogForTeam(i, prev, v);
-              recalcAll(true).then(ok=>{ if(ok) recalcOptIfNeeded(true); });
+              updateAdjLogForTeam(i, prev, v);
+              disableRecoveryByInput();
+              await runCalcByCurrentValidState(true);
               scheduleSave();
             };
             inp.addEventListener('compositionstart', ()=>{ composingAdj = true; });
@@ -462,7 +485,6 @@
             inp.addEventListener('input', ()=>{ if(!composingAdj) commit(); });
             td.appendChild(inp);
           }
-
           tr.appendChild(td);
         }
         body.appendChild(tr);
@@ -472,46 +494,80 @@
     }
 
     row.appendChild(left);
-
-    const cpuWrap = document.createElement('div');
-    cpuWrap.className = 'cpuInlineWrap';
-    cpuWrap.innerHTML = `<div class="cpuSpacerBlock"></div>`;
-    const cpuBox = document.createElement('div');
-    cpuBox.className = 'cpuInlineBox noLabels';
-    const cpuTag = document.createElement('div');
-    cpuTag.className = 'cpuInlineTitle';
-    cpuTag.textContent = '★CPU';
-    const cpuValue = document.createElement('div');
-    cpuValue.className = 'cpuInlineValue';
-    const cpuInp = document.createElement('input');
-    cpuInp.className = 'cellInp cpuKeyInp';
-    cpuInp.maxLength = 2;
-    cpuInp.autocomplete = 'off';
-    cpuInp.value = state.cpuKey || '';
-    cpuInp.addEventListener('input', ()=>{
-      const v = normalizeKey(cpuInp.value);
-      if(cpuInp.value !== v) cpuInp.value = v;
-      state.cpuKey = v;
-      refreshAfterTagChange();
-    });
-    cpuValue.appendChild(cpuInp);
-    cpuBox.append(cpuTag, cpuValue);
-    cpuWrap.appendChild(cpuBox);
-    row.appendChild(cpuWrap);
-
+    row.appendChild(makeCpuTagBox(colorOn));
     tagTables.appendChild(row);
     checkDuplicateKeys();
   }
 
-  function getBadgeClasses(text){
-    return longLabel(text) ? 'badgeTop left' : 'badgeTop';
+  function setColorSelectShort(sel){
+    for(const opt of sel.options){
+      opt.textContent = opt.value === sel.value ? (opt.dataset.short || opt.textContent) : SELECT_COLORS.find(c=> c.color === opt.value)?.name || opt.textContent;
+    }
+  }
+
+  function makeCpuTagBox(colorOn){
+    const wrap = document.createElement('div');
+    wrap.className = 'cpuInlineWrap';
+    const box = document.createElement('div');
+    box.className = colorOn ? 'cpuInlineBox' : 'cpuInlineBox noLabels';
+
+    if(colorOn){
+      const rowTag = document.createElement('div');
+      rowTag.className = 'cpuInlineRow';
+      const headTag = document.createElement('div');
+      headTag.className = 'cpuInlineHead';
+      headTag.textContent = 'タグ';
+      const cellTag = document.createElement('div');
+      cellTag.className = 'cpuInlineCell';
+      cellTag.textContent = '★CPU';
+      cellTag.style.background = CPU_COLOR;
+      cellTag.style.color = '#fff';
+      rowTag.append(headTag, cellTag);
+
+      const rowKey = document.createElement('div');
+      rowKey.className = 'cpuInlineRow';
+      const headKey = document.createElement('div');
+      headKey.className = 'cpuInlineHead';
+      headKey.textContent = 'キー';
+      const cellKey = document.createElement('div');
+      cellKey.className = 'cpuInlineCell';
+      const inp = makeCpuKeyInput();
+      cellKey.appendChild(inp);
+      rowKey.append(headKey, cellKey);
+      box.append(rowTag, rowKey);
+    }else{
+      const cpuTag = document.createElement('div');
+      cpuTag.className = 'cpuInlineTitle';
+      cpuTag.textContent = '★CPU';
+      const cpuValue = document.createElement('div');
+      cpuValue.className = 'cpuInlineValue';
+      cpuValue.appendChild(makeCpuKeyInput());
+      box.append(cpuTag, cpuValue);
+    }
+    wrap.appendChild(box);
+    return wrap;
+  }
+
+  function makeCpuKeyInput(){
+    const inp = document.createElement('input');
+    inp.className = 'cellInp cpuKeyInp';
+    inp.maxLength = 2;
+    inp.autocomplete = 'off';
+    inp.value = state.cpuKey || '';
+    inp.addEventListener('input', ()=>{
+      const v = normalizeKey(inp.value);
+      if(inp.value !== v) inp.value = v;
+      state.cpuKey = v;
+      refreshTagOnly();
+    });
+    return inp;
   }
 
   function makeBadge(i){
     const badge = document.createElement('div');
     badge.className = 'badge';
     const top = document.createElement('div');
-    top.className = getBadgeClasses(getTeamName(i));
+    top.className = shouldLeftAlignLabel(getTeamName(i)) ? 'badgeTop left' : 'badgeTop';
     top.textContent = getTeamName(i);
     const bg = hasColorSelect() ? (state.teams[i].color || '') : teamAutoColor(i);
     if(bg){ top.style.background = bg; top.style.color = '#000'; }
@@ -537,70 +593,97 @@
     return badge;
   }
 
+  function pinLayoutRule(){
+    const key = `${state.players}:${state.mode}`;
+    const map = {
+      '12:FFA': {rows:2, groups:[3,3,3,3]},
+      '12:2v2': {rows:1, groups:[3,3]},
+      '12:3v3': {rows:1, groups:[4]},
+      '12:4v4': {rows:1, groups:[3]},
+      '12:6v6': {rows:1, groups:[2]},
+      '24:FFA': {rows:2, groups:[6,6,6,6]},
+      '24:2v2': {rows:2, groups:[3,3,3,3]},
+      '24:3v3': {rows:1, groups:[4,4]},
+      '24:4v4': {rows:1, groups:[3,3]},
+      '24:6v6': {rows:1, groups:[4]},
+      '24:8v8': {rows:1, groups:[3]},
+      '24:12v12': {rows:1, groups:[2]},
+    };
+    return map[key] || {rows:1, groups:[teamCount()]};
+  }
+
+  function groupBreaksFor(rule,count){
+    const breaks = [];
+    let acc = 0;
+    for(const g of rule.groups){
+      acc += g;
+      if(acc < count) breaks.push(acc);
+    }
+    return breaks;
+  }
+
   function renderPinPreview(){
     pinPreview.innerHTML = '';
     const count = teamCount();
     const rule = pinLayoutRule();
-    const groupBreaks = [];
-    let acc = 0;
-    for(const g of rule.groups){
-      acc += g;
-      if(acc < count) groupBreaks.push(acc);
-    }
+    const breaks = groupBreaksFor(rule, count);
 
     if(rule.rows === 1){
       const row = document.createElement('div');
       row.className = 'pinRowLine pinRowLineNoWrap';
       for(let i=0;i<count;i++){
-        if(groupBreaks.includes(i)){
-          const sp = document.createElement('div');
-          sp.className = 'cpuSpacer';
-          row.appendChild(sp);
-        }
+        if(breaks.includes(i)) row.appendChild(makeSpacer());
         row.appendChild(makeBadge(i));
       }
-      const sp = document.createElement('div');
-      sp.className = 'cpuSpacer';
-      row.appendChild(sp);
+      row.appendChild(makeSpacer());
       row.appendChild(makeCpuBadge());
       pinPreview.appendChild(row);
+      buildPinBar();
       return;
     }
 
     const row1 = document.createElement('div');
     row1.className = 'pinRowLine pinRowLineNoWrap';
     const row2 = document.createElement('div');
-    row2.className = 'pinRowLine';
+    row2.className = 'pinRowLine pinRowLineNoWrap';
     const half = count / 2;
 
     for(let i=0;i<half;i++){
-      if(groupBreaks.includes(i)){
-        const sp = document.createElement('div');
-        sp.className = 'cpuSpacer';
-        row1.appendChild(sp);
-      }
+      if(breaks.includes(i)) row1.appendChild(makeSpacer());
       row1.appendChild(makeBadge(i));
     }
-    const cpuSp = document.createElement('div');
-    cpuSp.className = 'cpuSpacer';
-    row1.appendChild(cpuSp);
+    row1.appendChild(makeSpacer());
     row1.appendChild(makeCpuBadge());
 
     for(let i=half;i<count;i++){
-      if(groupBreaks.includes(i) && i !== half){
-        const sp = document.createElement('div');
-        sp.className = 'cpuSpacer';
-        row2.appendChild(sp);
-      }
+      if(breaks.includes(i) && i !== half) row2.appendChild(makeSpacer());
       row2.appendChild(makeBadge(i));
     }
     pinPreview.append(row1, row2);
+    buildPinBar();
+  }
+
+  function makeSpacer(){
+    const sp = document.createElement('div');
+    sp.className = 'cpuSpacer';
+    return sp;
   }
 
   function buildPinBar(){
     pinBarContent.innerHTML = '';
     const clone = pinPreview.cloneNode(true);
     while(clone.firstChild) pinBarContent.appendChild(clone.firstChild);
+  }
+
+  function showPin(){
+    renderPinPreview();
+    pinBar.classList.remove('hidden');
+    pinBar.setAttribute('aria-hidden','false');
+  }
+
+  function hidePin(){
+    pinBar.classList.add('hidden');
+    pinBar.setAttribute('aria-hidden','true');
   }
 
   function buildOptViewOptions(){
@@ -628,7 +711,7 @@
   function updateRankCellDisplay(td, r, p){
     const disp = td?.querySelector('.rankDisp');
     if(!disp) return;
-    const raw = (state.cells?.[r]?.[p] ?? '').trim();
+    const raw = String(state.cells?.[r]?.[p] ?? '').trim();
     let label = '';
     let bg = '';
     let placeholder = false;
@@ -646,20 +729,22 @@
       }else{
         label = getTeamName(idx);
         bg = hasColorSelect() ? (state.teams[idx].color || '') : teamAutoColor(idx);
-        left = longLabel(label);
+        left = shouldLeftAlignLabel(label);
       }
     }
     disp.textContent = label;
     disp.classList.toggle('placeholder', placeholder);
     disp.classList.toggle('left', left);
     td.style.background = placeholder ? '' : (bg || '');
+    if(bg) td.style.color = raw === state.cpuKey ? '#fff' : '#000';
+    else td.style.color = '';
   }
 
   function rebuildRankDisplays(){
     for(let r=0;r<state.races;r++){
       for(let p=0;p<state.players;p++){
         const td = getRankTd(r,p);
-        if(td) updateRankCellDisplay(td, r, p);
+        if(td) updateRankCellDisplay(td,r,p);
       }
     }
   }
@@ -675,22 +760,15 @@
     }
   }
 
-  function focusNextCellSameRace(r, p){
-    const nextPos = p + 1;
-    if(nextPos >= state.players) return;
-    const next = rankWrap.querySelector(`input.rankKey[data-race="${r}"][data-pos="${nextPos}"]`);
-    if(next && !next.disabled) next.focus();
-  }
-
   function countEmpties(r){
     let c = 0;
-    for(let p=0;p<state.players;p++) if((state.cells?.[r]?.[p] ?? '') === '') c++;
+    for(let p=0;p<state.players;p++) if(String(state.cells?.[r]?.[p] ?? '') === '') c++;
     return c;
   }
 
   function allCellsFilled(r){ return countEmpties(r) === 0; }
 
-  function markRaceError(r, msg){
+  function markRaceError(r,msg){
     const box = rankWrap.querySelector(`.raceErrorText[data-race="${r}"]`);
     if(box) box.textContent = msg;
     rankWrap.querySelectorAll(`.raceCellTd[data-race="${r}"]`).forEach(td=> td.classList.toggle('raceError', !!msg));
@@ -704,7 +782,6 @@
   function buildRankTable(){
     rankWrap.innerHTML = '';
     const points = getPoints();
-
     const title = document.createElement('div');
     title.className = 'raceCountTitle';
     title.textContent = 'レース数';
@@ -738,7 +815,6 @@
     const tbody = document.createElement('tbody');
     for(let p=0;p<state.players;p++){
       const tr = document.createElement('tr');
-
       const tdRank = document.createElement('td');
       tdRank.className = 'rankCol rankCellTd';
       tdRank.textContent = String(p + 1);
@@ -758,10 +834,8 @@
         td.dataset.pos = String(p);
         if(state.players === 24 && p === 12) td.classList.add('sepTop');
         if(r === 7) td.classList.add('raceSplit');
-
         const box = document.createElement('div');
         box.className = 'rankCell';
-
         const inp = document.createElement('input');
         inp.className = 'rankKey';
         inp.autocomplete = 'off';
@@ -770,19 +844,18 @@
         inp.dataset.pos = String(p);
         inp.addEventListener('focus', ()=>{ try{ inp.select(); }catch(_e){} });
         inp.addEventListener('input', async ()=>{
+          checkNewRaceInputAfterFinish();
           const v = normalizeKey(inp.value);
           if(inp.value !== v) inp.value = v;
           if(!state.cells[r]) state.cells[r] = {};
           state.cells[r][p] = v;
-          updateRankCellDisplay(td, r, p);
-          const ok = await recalcAll(true);
-          if(ok) recalcOptIfNeeded(true); else outOpt.textContent = '';
+          disableRecoveryByInput();
+          updateRankCellDisplay(td,r,p);
+          await runCalcAfterRankInput();
           scheduleSave();
         });
-
         const disp = document.createElement('div');
         disp.className = 'rankDisp';
-
         box.append(inp, disp);
         td.appendChild(box);
         tr.appendChild(td);
@@ -825,10 +898,11 @@
       inp.autocomplete = 'off';
       inp.value = state.courses?.[r] ?? '';
       inp.dataset.race = String(r);
-      inp.addEventListener('input', async ()=>{
+      inp.addEventListener('input', ()=>{
+        checkNewRaceInputAfterFinish();
         state.courses[r] = inp.value;
-        const ok = await recalcAll(true);
-        if(ok) recalcOptIfNeeded(true); else outOpt.textContent = '';
+        disableRecoveryByInput();
+        renderCourseLog(state.courses);
         scheduleSave();
       });
       td.appendChild(inp);
@@ -855,6 +929,7 @@
       btn.textContent = state.locks[r] ? '🔒' : '🔓';
       btn.addEventListener('click', ()=>{
         state.locks[r] = !state.locks[r];
+        disableRecoveryByInput();
         applyLocks();
         scheduleSave();
       });
@@ -862,21 +937,19 @@
       lockRow.appendChild(cell);
     }
     rankWrap.appendChild(lockRow);
-
     rebuildRankDisplays();
     applyLocks();
   }
 
   function currentCompletedRaceCount(){
     let c = 0;
-    for(let r=0;r<state.races;r++) if(allCellsFilled(r)) c++;
+    for(let r=0;r<state.races;r++) if(allCellsFilled(r) && isRaceValidForCalc(r).ok) c++;
     return c;
   }
 
   function ensureAdjLogShape(){
     if(!Array.isArray(state.adjLog)) state.adjLog = [];
     state.adjLog = state.adjLog.filter(entry=> entry && Number.isFinite(Number(entry.race)) && Array.isArray(entry.changes));
-    if(!state.adjSnapshots || typeof state.adjSnapshots !== 'object') state.adjSnapshots = {};
   }
 
   function currentAdjRaceNo(){
@@ -919,9 +992,7 @@
 
   function renderAdjLog(){
     ensureAdjLogShape();
-    logAdj.textContent = state.adjLog
-      .map(entry => `${entry.race}レース目 ${entry.changes.map(change => `${getTeamName(change.teamIdx)} ${change.diff}`).join('／')}`)
-      .join('\n');
+    logAdj.textContent = state.adjLog.map(entry => `${entry.race}レース目 ${entry.changes.map(change => `${getTeamName(change.teamIdx)} ${change.diff}`).join('／')}`).join('／');
   }
 
   function renderCourseLog(courseLog){
@@ -930,13 +1001,11 @@
       return;
     }
     const summary = [];
-    const lines = [];
     for(let r=0;r<state.races;r++){
       const c = String(courseLog?.[r] ?? state.courses?.[r] ?? '').trim();
       if(c) summary.push(c);
-      lines.push(`${r+1}レース目 ${c}`);
     }
-    logCourse.textContent = `${summary.join('／')}\n\n${lines.join('\n')}`.trim();
+    logCourse.textContent = summary.join('／');
   }
 
   async function copyText(text){
@@ -958,32 +1027,52 @@
     }
   }
 
-  let copyStatusTimer = null;
-
   function showCopyStatus(){
     if(copyStatusTimer) clearTimeout(copyStatusTimer);
     copyStatusMsg.textContent = '★自動コピーしました';
     copyStatusTimer = setTimeout(()=>{ copyStatusMsg.textContent = ''; }, 10000);
   }
 
-  async function maybeAutoCopyMain(){
-    const text = outMain.textContent.trim();
-    if(!text) return;
+  async function maybeAutoCopyMain(newText){
+    const text = String(newText ?? outMain.textContent).trim();
+    if(!text || text === lastMainText) return;
+    lastMainText = text;
     const ok = await copyText(text);
     if(ok) showCopyStatus();
+  }
+
+  function isRaceValidForCalc(r){
+    const count = teamCount();
+    const keyMap = getKeyMap();
+    const requiredPerTeam = Math.floor(state.players / count);
+    const counts = Array(count).fill(0);
+    let cpuCount = 0;
+    let invalid = false;
+    for(let p=0;p<state.players;p++){
+      const raw = String(state.cells?.[r]?.[p] ?? '').trim();
+      if(!raw) return {ok:false, reason:'empty'};
+      if(state.cpuKey && raw === state.cpuKey){ cpuCount++; continue; }
+      const idx = keyMap.get(raw);
+      if(idx == null){ invalid = true; continue; }
+      counts[idx]++;
+    }
+    const shortages = counts.map(c=> requiredPerTeam - c);
+    const overage = shortages.some(v=> v < 0);
+    const shortageSum = shortages.reduce((a,b)=> a + Math.max(0,b), 0);
+    if(invalid || overage) return {ok:false, reason:'invalid'};
+    if((cpuCount > 0 || shortageSum > 0) && cpuCount !== shortageSum) return {ok:false, reason:'invalid'};
+    return {ok:true};
   }
 
   function getLastCompletedCourse(courseLog, completedRaces){
     if(completedRaces <= 0) return '';
     const idx = completedRaces - 1;
-    const c = String(courseLog?.[idx] ?? '').trim();
-    return c || '';
+    return String(courseLog?.[idx] ?? '').trim();
   }
 
   function calcStandings(){
     clearRaceErrors();
     if(!checkDuplicateKeys()) return {ok:false};
-
     const count = teamCount();
     const points = getPoints();
     const keyMap = getKeyMap();
@@ -998,44 +1087,34 @@
       let cpuCount = 0;
       let hasInvalid = false;
       const empties = countEmpties(r);
-
       for(let p=0;p<state.players;p++){
-        const raw = (state.cells?.[r]?.[p] ?? '').trim();
+        const raw = String(state.cells?.[r]?.[p] ?? '').trim();
         if(!raw) continue;
         if(state.cpuKey && raw === state.cpuKey){ cpuCount++; continue; }
         const idx = keyMap.get(raw);
         if(idx == null){ hasInvalid = true; continue; }
         counts[idx]++;
       }
-
       const shortages = counts.map(c=> requiredPerTeam - c);
       const overage = shortages.some(v=> v < 0);
-      const shortageTeams = shortages.map((v,i)=> v > 0 ? i : -1).filter(v=> v >= 0);
-      const shortageSum = shortages.reduce((a,b)=> a + Math.max(0, b), 0);
-      const canAuto = cpuCount === 0 && !overage && shortageTeams.length === 1 && empties > 0 && shortageSum === empties;
-      const complete = allCellsFilled(r) || canAuto;
-
+      const shortageSum = shortages.reduce((a,b)=> a + Math.max(0,b), 0);
+      const complete = allCellsFilled(r);
       if(!complete) continue;
-
       if(overage || hasInvalid){
         markRaceError(r, '入力ミス');
         hasError = true;
         continue;
       }
-
       if((cpuCount > 0 || shortageSum > 0) && cpuCount !== shortageSum){
         markRaceError(r, '入力ミス');
         hasError = true;
         continue;
       }
-
       const teamScore = Array(count).fill(0);
       for(let p=0;p<state.players;p++){
-        const raw = (state.cells?.[r]?.[p] ?? '').trim();
+        const raw = String(state.cells?.[r]?.[p] ?? '').trim();
         let idx = null;
-        if(!raw){
-          if(canAuto) idx = shortageTeams[0];
-        }else if(state.cpuKey && raw === state.cpuKey){
+        if(state.cpuKey && raw === state.cpuKey){
           idx = null;
         }else{
           const found = keyMap.get(raw);
@@ -1043,22 +1122,18 @@
         }
         if(idx != null) teamScore[idx] += points[p];
       }
-
       if(shortageSum > 0){
         const cpuPoints = [];
         for(let p=0;p<state.players;p++){
-          const raw = (state.cells?.[r]?.[p] ?? '').trim();
+          const raw = String(state.cells?.[r]?.[p] ?? '').trim();
           if(state.cpuKey && raw === state.cpuKey) cpuPoints.push(points[p]);
         }
         let adopted = 0;
         if(cpuPoints.length){
-          adopted = state.cpuCalc === 'MKB'
-            ? Math.min(...cpuPoints)
-            : Math.floor(cpuPoints.reduce((a,b)=> a+b, 0) / cpuPoints.length);
+          adopted = state.cpuCalc === 'MKB' ? Math.min(...cpuPoints) : Math.floor(cpuPoints.reduce((a,b)=> a+b, 0) / cpuPoints.length);
         }
         for(let i=0;i<count;i++) if(shortages[i] > 0) teamScore[i] += adopted * shortages[i];
       }
-
       raceScores[r] = {};
       for(let i=0;i<count;i++){
         teamTotals[i] += teamScore[i];
@@ -1066,17 +1141,13 @@
       }
       courseLog[r] = String(state.courses?.[r] ?? '').trim();
     }
-
     if(hasError) return {ok:false};
-
-    const displayTotals = visibleIndexes().map(i=> teamTotals[i] + safeParseInt(state.teams[i].adj));
-    const standings = visibleIndexes().map((i,order)=> ({
-      idx: i,
-      name: getTeamName(i),
-      total: teamTotals[i],
-      displayTotal: displayTotals[order],
+    const standings = visibleIndexes().map(i=>({
+      idx:i,
+      name:getTeamName(i),
+      total:teamTotals[i],
+      displayTotal:teamTotals[i] + safeParseInt(state.teams[i].adj),
     })).sort((a,b)=> b.displayTotal - a.displayTotal || a.idx - b.idx);
-
     const completedRaces = Object.keys(raceScores).length;
     const remaining = clamp(state.races - completedRaces, 0, state.races);
     return {ok:true, standings, remaining, courseLog, completedRaces};
@@ -1088,12 +1159,19 @@
     return diff > 0 ? `+${diff}` : `${diff}`;
   }
 
+  function rankLabelFor(standings, baseIdx, remaining){
+    const target = standings.find(s=> s.idx === baseIdx);
+    if(!target) return '';
+    const rank = standings.filter(s=> s.displayTotal > target.displayTotal).length + 1;
+    const tied = standings.some(s=> s.idx !== baseIdx && s.displayTotal === target.displayTotal);
+    return `${remaining === 0 ? '最終' : '現在'}${rank}位${tied ? 'ﾀｲ' : ''}`;
+  }
+
   function buildCertTextForBase(standings, remaining, baseIdx){
     const maxDiff = MAXDIFF[state.players][state.mode] ?? 0;
     const rank = standings.findIndex(x=> x.idx === baseIdx);
     if(rank < 0 || standings.length < 2) return '';
     const threshold = maxDiff * remaining;
-
     if(standings.length === 2){
       if(rank === 0){
         const lead = standings[0].displayTotal - standings[1].displayTotal;
@@ -1101,7 +1179,6 @@
       }
       return '';
     }
-
     const q = safeParseInt(sanitizeIntInput(state.qualify));
     if(rank === 0){
       const lead = standings[0].displayTotal - standings[1].displayTotal;
@@ -1115,24 +1192,33 @@
     return '';
   }
 
+  function orderForBase(standings, baseIdx){
+    const base = standings.find(s=> s.idx === baseIdx);
+    if(!base) return standings;
+    return [...standings].sort((a,b)=>{
+      if(b.displayTotal !== a.displayTotal) return b.displayTotal - a.displayTotal;
+      if(a.displayTotal === base.displayTotal){
+        if(a.idx === baseIdx) return -1;
+        if(b.idx === baseIdx) return 1;
+      }
+      return a.idx - b.idx;
+    });
+  }
+
   function buildStandardLine(standings, remaining, baseIdx, courseName){
     const base = standings.find(s=> s.idx === baseIdx);
     if(!base) return '';
+    const ordered = orderForBase(standings, baseIdx);
     const parts = [];
-    for(const s of standings){
+    for(const s of ordered){
       if(s.idx === baseIdx){
         parts.push(`【${s.name}】 ${s.displayTotal}`);
       }else{
         const diff = formatDiff(base.displayTotal, s.displayTotal);
-        if(state.showSum){
-          parts.push(`${s.name} ${s.displayTotal}(${diff})`);
-        }else{
-          parts.push(`${s.name} ${diff}`);
-        }
+        parts.push(state.showSum ? `${s.name} ${s.displayTotal}(${diff})` : `${s.name} ${diff}`);
       }
     }
-    const rank = standings.findIndex(s=> s.idx === baseIdx);
-    if(rank >= 0) parts.push(`${remaining === 0 ? '最終' : '現在'}${rank+1}位`);
+    parts.push(rankLabelFor(standings, baseIdx, remaining));
     if(courseName) parts.push(courseName);
     parts.push(`＠${remaining}`);
     if(hasAnyAdjInput()) parts.push('(補正込)');
@@ -1140,38 +1226,44 @@
       const cert = buildCertTextForBase(standings, remaining, baseIdx);
       if(cert) parts.push(cert);
     }
-    return parts.join('／');
+    return parts.filter(Boolean).join('／');
   }
 
   function buildSumOnlyLine(standings, remaining, courseName){
-    const parts = standings.map((s, idx)=> `${idx+1}位 ${s.name} ${s.displayTotal}`);
+    const parts = standings.map(s=> `${s.name} ${s.displayTotal}`);
     if(courseName) parts.push(courseName);
     parts.push(`＠${remaining}`);
     if(hasAnyAdjInput()) parts.push('(補正込)');
     return parts.join('／');
   }
 
-  async function recalcAll(doLogs){
+  async function recalcAndRender(autoCopy){
     spMaxDiff.textContent = String(MAXDIFF[state.players][state.mode] ?? '--');
-    certText.textContent = '';
     const res = calcStandings();
     if(!res.ok){
-      if(doLogs){ renderAdjLog(); renderCourseLog(res.courseLog || {}); }
+      renderAdjLog();
+      renderCourseLog(state.courses);
       return false;
     }
-
     const courseName = getLastCompletedCourse(res.courseLog, res.completedRaces);
-    if(state.dispMode === 'sumOnly'){
-      outMain.textContent = buildSumOnlyLine(res.standings, res.remaining, courseName);
+    const main = state.dispMode === 'sumOnly'
+      ? buildSumOnlyLine(res.standings, res.remaining, courseName)
+      : buildStandardLine(res.standings, res.remaining, currentMainBaseIdx(), courseName);
+    outMain.textContent = main;
+    renderOptFromResult(res, courseName);
+    renderAdjLog();
+    renderCourseLog(res.courseLog);
+    if(res.remaining === 0 && res.completedRaces === state.races){
+      if(!state.finishedAt) state.finishedAt = nowMs();
     }else{
-      outMain.textContent = buildStandardLine(res.standings, res.remaining, currentMainBaseIdx(), courseName);
+      state.finishedAt = null;
     }
-    if(doLogs){ renderAdjLog(); renderCourseLog(res.courseLog); }
-    await maybeAutoCopyMain();
+    updateRecoveryButton();
+    if(autoCopy) await maybeAutoCopyMain(main);
     return true;
   }
 
-  function recalcOptIfNeeded(doLogs){
+  function renderOptFromResult(res, courseName){
     if(state.optViewTeam === 'none'){
       outOpt.textContent = '';
       return;
@@ -1181,14 +1273,45 @@
       outOpt.textContent = '';
       return;
     }
-    const res = calcStandings();
-    if(!res.ok){
-      outOpt.textContent = '';
-      return;
-    }
-    const courseName = getLastCompletedCourse(res.courseLog, res.completedRaces);
     outOpt.textContent = buildStandardLine(res.standings, res.remaining, baseIdx, courseName);
-    if(doLogs){ renderAdjLog(); renderCourseLog(res.courseLog); }
+  }
+
+  async function runCalcAfterRankInput(){
+    if(!allEnteredAndValid()){
+      calcStandings();
+      renderAdjLog();
+      renderCourseLog(state.courses);
+      return false;
+    }
+    return await recalcAndRender(true);
+  }
+
+  async function runCalcByCurrentValidState(autoCopy){
+    const hasAnyCompleted = visibleCompletedRaceCount() > 0;
+    if(!hasAnyCompleted){
+      calcStandings();
+      renderAdjLog();
+      renderCourseLog(state.courses);
+      return false;
+    }
+    return await recalcAndRender(autoCopy);
+  }
+
+  function visibleCompletedRaceCount(){
+    let n = 0;
+    for(let r=0;r<state.races;r++) if(allCellsFilled(r) && isRaceValidForCalc(r).ok) n++;
+    return n;
+  }
+
+  function allEnteredAndValid(){
+    let hasComplete = false;
+    for(let r=0;r<state.races;r++){
+      if(allCellsFilled(r)){
+        hasComplete = true;
+        if(!isRaceValidForCalc(r).ok) return false;
+      }
+    }
+    return hasComplete;
   }
 
   function pruneInputs(){
@@ -1206,14 +1329,12 @@
     state.locks = newLocks;
   }
 
-  async function refreshAfterTagChange(){
+  function refreshTagOnly(){
     checkDuplicateKeys();
     buildOptViewOptions();
     renderPinPreview();
-    buildPinBar();
     rebuildRankDisplays();
-    const ok = await recalcAll(true);
-    if(ok) recalcOptIfNeeded(true); else outOpt.textContent = '';
+    renderAdjLog();
     scheduleSave();
   }
 
@@ -1230,9 +1351,9 @@
     buildOptViewOptions();
     buildRankTable();
     renderPinPreview();
-    buildPinBar();
-    const ok = await recalcAll(true);
-    if(ok) recalcOptIfNeeded(true);
+    spMaxDiff.textContent = String(MAXDIFF[state.players][state.mode] ?? '--');
+    renderAdjLog();
+    renderCourseLog(state.courses);
     scheduleSave();
   }
 
@@ -1241,17 +1362,21 @@
       state.teams[i].name = '';
       state.teams[i].key = '';
       state.teams[i].color = '';
-      state.teams[i].adj = '';
     }
     state.cpuKey = '';
     state.selfTeamIndex = '0';
-    state.adjLog = [];
-    state.adjSnapshots = {};
+    buildTagTables();
     buildOptViewOptions();
-    refreshAfterTagChange();
+    renderPinPreview();
+    rebuildRankDisplays();
+    renderAdjLog();
+    scheduleSave();
   }
 
   async function resetAll(){
+    state.recoverySnapshot = snapshotResetData();
+    state.recoveryAvailable = true;
+    state.finishedAt = null;
     for(let r=0;r<state.races;r++){
       state.cells[r] = {};
       for(let p=0;p<state.players;p++) state.cells[r][p] = '';
@@ -1260,23 +1385,66 @@
     }
     for(let i=0;i<MAX_TEAMS;i++) state.teams[i].adj = '';
     state.adjLog = [];
-    state.adjSnapshots = {};
+    outMain.textContent = '';
+    outOpt.textContent = '';
+    lastMainText = '';
     buildTagTables();
+    buildOptViewOptions();
     buildRankTable();
     renderPinPreview();
-    buildPinBar();
-    const ok = await recalcAll(true);
-    if(ok) recalcOptIfNeeded(true); else outOpt.textContent = '';
+    renderAdjLog();
+    renderCourseLog(state.courses);
+    updateRecoveryButton();
     scheduleSave();
   }
 
-  function openModal(){ modalSpec.classList.remove('hidden'); modalSpec.setAttribute('aria-hidden', 'false'); }
-  function closeModal(){ modalSpec.classList.add('hidden'); modalSpec.setAttribute('aria-hidden', 'true'); }
-
-  function init(){
-    const restored = loadSaved();
+  function recoverReset(){
+    if(!state.recoveryAvailable || !state.recoverySnapshot) return;
+    const snap = state.recoverySnapshot;
+    state.cells = structuredCloneSafe(snap.cells || {});
+    state.courses = structuredCloneSafe(snap.courses || {});
+    state.locks = structuredCloneSafe(snap.locks || {});
     ensureTeams();
+    if(Array.isArray(snap.teamsAdj)){
+      for(let i=0;i<Math.min(MAX_TEAMS,snap.teamsAdj.length);i++) state.teams[i].adj = sanitizeIntInput(snap.teamsAdj[i] ?? '');
+    }
+    state.adjLog = Array.isArray(snap.adjLog) ? structuredCloneSafe(snap.adjLog) : [];
+    state.finishedAt = snap.finishedAt || null;
+    state.recoveryAvailable = false;
+    state.recoverySnapshot = null;
+    buildTagTables();
+    buildRankTable();
+    renderPinPreview();
+    runCalcByCurrentValidState(false);
+    updateRecoveryButton();
+    scheduleSave();
+  }
 
+  function updateRecoveryButton(){
+    btnRecovery.disabled = !(state.recoveryAvailable && state.recoverySnapshot);
+  }
+
+  function disableRecoveryByInput(){
+    if(!state.recoveryAvailable) return;
+    state.recoveryAvailable = false;
+    state.recoverySnapshot = null;
+    updateRecoveryButton();
+  }
+
+  function checkNewRaceInputAfterFinish(){
+    if(suppressNewRaceCheck) return;
+    if(!state.finishedAt) return;
+    state.finishedAt = null;
+    state.recoverySnapshot = null;
+    state.recoveryAvailable = false;
+    clearStorageOnly();
+    updateRecoveryButton();
+  }
+
+  function openModal(){ modalSpec.classList.remove('hidden'); modalSpec.setAttribute('aria-hidden','false'); }
+  function closeModal(){ modalSpec.classList.add('hidden'); modalSpec.setAttribute('aria-hidden','true'); }
+
+  function initControls(){
     document.querySelectorAll('input[name="players"]').forEach(r=>{
       r.checked = Number(r.value) === state.players;
       r.addEventListener('change', onRuleChange);
@@ -1289,7 +1457,6 @@
       r.checked = r.value === state.cpuCalc;
       r.addEventListener('change', onRuleChange);
     });
-
     buildModeOptions();
     selMode.value = state.mode;
     selMode.addEventListener('change', ()=>{ state.mode = selMode.value; onRuleChange(); });
@@ -1301,8 +1468,7 @@
       const v = sanitizeIntInput(inpQualify.value);
       if(inpQualify.value !== v) inpQualify.value = v;
       state.qualify = v;
-      const ok = await recalcAll(true);
-      if(ok) recalcOptIfNeeded(true);
+      await runCalcByCurrentValidState(false);
       scheduleSave();
     });
     inpQualify.addEventListener('input', async ()=>{
@@ -1310,8 +1476,7 @@
       const v = sanitizeIntInput(inpQualify.value);
       if(inpQualify.value !== v) inpQualify.value = v;
       state.qualify = v;
-      const ok = await recalcAll(true);
-      if(ok) recalcOptIfNeeded(true);
+      await runCalcByCurrentValidState(false);
       scheduleSave();
     });
 
@@ -1319,65 +1484,66 @@
       r.checked = r.value === state.dispMode;
       r.addEventListener('change', async ()=>{
         state.dispMode = document.querySelector('input[name="dispMode"]:checked')?.value || 'normal';
-        const ok = await recalcAll(true);
-        if(ok) recalcOptIfNeeded(true); else outOpt.textContent = '';
+        await runCalcByCurrentValidState(false);
         scheduleSave();
       });
     });
-
     btnResetTags.addEventListener('click', resetTags);
     btnResetAll.addEventListener('click', resetAll);
-
-    btnCopyMain.addEventListener('click', async ()=>{
-      await copyText(outMain.textContent);
-    });
+    btnRecovery.addEventListener('click', recoverReset);
+    btnCopyMain.addEventListener('click', async ()=>{ await copyText(outMain.textContent); });
     btnCopyOpt.addEventListener('click', async ()=>{ await copyText(outOpt.textContent); });
 
     chkShowSum.checked = state.showSum;
     chkShowCert.checked = state.showCert;
     chkShowCourseLog.checked = state.showCourseLog;
-
     chkShowSum.addEventListener('change', async ()=>{
       state.showSum = chkShowSum.checked;
-      const ok = await recalcAll(true);
-      if(ok) recalcOptIfNeeded(true);
+      await runCalcByCurrentValidState(false);
       scheduleSave();
     });
     chkShowCert.addEventListener('change', async ()=>{
       state.showCert = chkShowCert.checked;
-      const ok = await recalcAll(true);
-      if(ok) recalcOptIfNeeded(true);
+      await runCalcByCurrentValidState(false);
       scheduleSave();
     });
-    chkShowCourseLog.addEventListener('change', async ()=>{
+    chkShowCourseLog.addEventListener('change', ()=>{
       state.showCourseLog = chkShowCourseLog.checked;
-      const ok = await recalcAll(true);
-      if(ok) recalcOptIfNeeded(true);
+      renderCourseLog(state.courses);
       scheduleSave();
     });
-
-    buildOptViewOptions();
-    selView.addEventListener('change', ()=>{
+    selView.addEventListener('change', async ()=>{
       state.optViewTeam = selView.value;
-      recalcOptIfNeeded(true);
+      await runCalcByCurrentValidState(false);
       scheduleSave();
     });
-
     btnPin.addEventListener('click', showPin);
     btnPinClose.addEventListener('click', hidePin);
     btnSpec.addEventListener('click', openModal);
     btnSpecClose.addEventListener('click', closeModal);
     modalSpec.querySelector('.modalBack')?.addEventListener('click', closeModal);
+  }
 
+  function init(){
+    suppressNewRaceCheck = true;
+    loadSaved();
+    ensureTeams();
     ensureSelections();
+    pruneInputs();
+    initControls();
     buildTagTables();
     buildOptViewOptions();
     buildRankTable();
     renderPinPreview();
-    buildPinBar();
-    recalcAll(true).then(ok=>{ if(ok) recalcOptIfNeeded(true); });
-
-    if(!restored){ state.lastUpdated = nowMs(); doSave(); }
+    spMaxDiff.textContent = String(MAXDIFF[state.players][state.mode] ?? '--');
+    renderAdjLog();
+    renderCourseLog(state.courses);
+    updateRecoveryButton();
+    runCalcByCurrentValidState(false).then(()=>{
+      suppressNewRaceCheck = false;
+      state.lastUpdated = state.lastUpdated || nowMs();
+      doSave();
+    });
   }
 
   init();
