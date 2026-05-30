@@ -12,7 +12,7 @@
     <header class="header">
       <div class="titleRow">
         <h1 class="title">MKWorld即時集計表</h1>
-        <button id="btnSpec" class="pill">サイト仕様書</button>
+        <button id="btnSpec" class="pill" tabindex="-1">サイト仕様書</button>
       </div>
     </header>
 
@@ -62,7 +62,7 @@
             <span id="dupKeyMsg" class="errInline" aria-live="polite"></span>
           </div>
           <div class="cardActions">
-            <button id="btnResetTags" class="btn">Reset Tags</button>
+            <button id="btnResetTags" class="btn btnResetAction" tabindex="-1">Reset Tags</button>
           </div>
         </div>
 
@@ -77,11 +77,11 @@
         <div class="cardHead">
           <div class="cardTitleRow">
             <div class="cardTitle">順位入力</div>
-            <button id="btnPin" class="btn">タグ固定</button>
+            <button id="btnPin" class="btn" tabindex="-1">タグ固定</button>
           </div>
-          <div class="cardActions">
-            <button id="btnResetAll" class="btn">Reset</button>
-            <button id="btnRecovery" class="btn btnRecovery" disabled>Recovery</button>
+          <div class="cardActions resetActionStack">
+            <button id="btnResetAll" class="btn btnResetAction" tabindex="-1">Reset</button>
+            <button id="btnRecovery" class="btn btnRecovery btnResetAction" tabindex="-1" disabled>Recovery</button>
           </div>
         </div>
 
@@ -103,7 +103,7 @@
             <span id="copyStatusMsg" class="copyStatusMsg" aria-live="polite"></span>
           </div>
           <div class="cardActions">
-            <button id="btnCopyMain" class="btn">copy</button>
+            <button id="btnCopyMain" class="btn" tabindex="-1">copy</button>
           </div>
         </div>
 
@@ -130,7 +130,7 @@
 
         <div class="optionRow">
           <div class="optTitle">集計オプション</div>
-          <button id="btnCopyOpt" class="btn">copy</button>
+          <button id="btnCopyOpt" class="btn" tabindex="-1">copy</button>
           <select id="selView" class="sel"></select>
         </div>
 
@@ -157,7 +157,7 @@
   <div id="pinBar" class="pinBar hidden" aria-hidden="true">
     <div class="pinBarInner">
       <div id="pinBarContent" class="pinBarContent"></div>
-      <button id="btnPinClose" class="pinClose" aria-label="閉じる">×</button>
+      <button id="btnPinClose" class="pinClose" aria-label="閉じる" tabindex="-1">×</button>
     </div>
   </div>
 
@@ -166,15 +166,10 @@
     <div class="modalBox">
       <div class="modalHead">
         <div class="modalTitle">サイト仕様書</div>
-        <button id="btnSpecClose" class="pinClose" aria-label="閉じる">×</button>
+        <button id="btnSpecClose" class="pinClose" aria-label="閉じる" tabindex="-1">×</button>
       </div>
       <div class="modalBody">
-        <div class="specText">
-          ※このページは検索避け（noindex/robots）設定済みです。<br>
-          本ツールはローカル保存（localStorage）で動作します。<br>
-          ブラウザを閉じた後も同じデバイス・同じブラウザでは最後の状態を復元します。<br>
-          レース終了後、次のレース入力開始時または24時間経過時に保存データを削除します。
-        </div>
+        <div class="specText">準備中</div>
       </div>
     </div>
   </div>
