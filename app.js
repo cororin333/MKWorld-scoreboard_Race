@@ -1,7 +1,7 @@
 (()=> {
   'use strict';
 
-  const VERSION = 'mkworld_recovery_storage_20260509';
+  const VERSION = 'mkworld_complete_20260530';
   const LS_KEY = 'mkworld:' + location.pathname;
   const MAX_TEAMS = 24;
   const FINISHED_TTL_MS = 24 * 60 * 60 * 1000;
@@ -234,7 +234,8 @@
       if(!raw) return false;
       const obj = JSON.parse(raw);
       if(!obj || typeof obj !== 'object') return false;
-      if(obj.finishedAt && nowMs() - Number(obj.finishedAt) >= FINISHED_TTL_MS){
+      const savedAt = Number(obj.lastUpdated) || Number(obj.finishedAt) || 0;
+      if(!savedAt || nowMs() - savedAt >= FINISHED_TTL_MS){
         clearStorageOnly();
         return false;
       }
@@ -358,7 +359,11 @@
   }
 
   function colorDisplay(color){
-    return SELECT_COLORS.find(c=> c.color === color)?.display || '';
+    return SELECT_COLORS.find(c=> c.color === color)?.name || '未選択';
+  }
+
+  function isNoAutoColorMode(){
+    return state.players === 24 && state.mode === 'FFA';
   }
 
   function buildTagTables(){
@@ -367,7 +372,7 @@
     const count = teamCount();
     const colorOn = hasColorSelect(count);
     const row = document.createElement('div');
-    row.className = 'tagMainRow';
+    row.className = colorOn ? 'tagMainRow colorOn' : 'tagMainRow';
     const left = document.createElement('div');
     left.className = 'tagTablesCol';
 
@@ -394,7 +399,8 @@
 
           if(rowDef.kind === 'name'){
             const inp = document.createElement('input');
-            inp.className = 'cellInp smalltxt';
+            inp.className = 'cellInp smalltxt tagNameInp';
+            inp.dataset.teamIndex = String(i);
             inp.maxLength = 12;
             inp.autocomplete = 'off';
             inp.value = state.teams[i].name || '';
@@ -448,7 +454,8 @@
 
           if(rowDef.kind === 'key'){
             const inp = document.createElement('input');
-            inp.className = 'cellInp';
+            inp.className = 'cellInp tagKeyInp';
+            inp.dataset.teamIndex = String(i);
             inp.maxLength = 2;
             inp.autocomplete = 'off';
             inp.value = state.teams[i].key || '';
@@ -464,7 +471,8 @@
           if(rowDef.kind === 'adj'){
             let composingAdj = false;
             const inp = document.createElement('input');
-            inp.className = 'cellInp';
+            inp.className = 'cellInp tagAdjInp';
+            inp.dataset.teamIndex = String(i);
             inp.autocomplete = 'off';
             inp.inputMode = 'numeric';
             inp.value = state.teams[i].adj || '';
@@ -497,11 +505,12 @@
     row.appendChild(makeCpuTagBox(colorOn));
     tagTables.appendChild(row);
     checkDuplicateKeys();
+    setTabOrder();
   }
 
   function setColorSelectShort(sel){
     for(const opt of sel.options){
-      opt.textContent = opt.value === sel.value ? (opt.dataset.short || opt.textContent) : SELECT_COLORS.find(c=> c.color === opt.value)?.name || opt.textContent;
+      opt.textContent = SELECT_COLORS.find(c=> c.color === opt.value)?.name || opt.textContent;
     }
   }
 
@@ -509,41 +518,32 @@
     const wrap = document.createElement('div');
     wrap.className = 'cpuInlineWrap';
     const box = document.createElement('div');
-    box.className = colorOn ? 'cpuInlineBox' : 'cpuInlineBox noLabels';
+    box.className = 'cpuInlineBox';
 
-    if(colorOn){
-      const rowTag = document.createElement('div');
-      rowTag.className = 'cpuInlineRow';
-      const headTag = document.createElement('div');
-      headTag.className = 'cpuInlineHead';
-      headTag.textContent = 'タグ';
-      const cellTag = document.createElement('div');
-      cellTag.className = 'cpuInlineCell';
-      cellTag.textContent = '★CPU';
-      cellTag.style.background = CPU_COLOR;
-      cellTag.style.color = '#fff';
-      rowTag.append(headTag, cellTag);
+    const rowTag = document.createElement('div');
+    rowTag.className = 'cpuInlineRow';
+    const headTag = document.createElement('div');
+    headTag.className = 'cpuInlineHead';
+    headTag.textContent = 'タグ';
+    const cellTag = document.createElement('div');
+    cellTag.className = 'cpuInlineCell';
+    cellTag.textContent = '★CPU';
+    cellTag.style.background = CPU_COLOR;
+    cellTag.style.color = '#fff';
+    rowTag.append(headTag, cellTag);
 
-      const rowKey = document.createElement('div');
-      rowKey.className = 'cpuInlineRow';
-      const headKey = document.createElement('div');
-      headKey.className = 'cpuInlineHead';
-      headKey.textContent = 'キー';
-      const cellKey = document.createElement('div');
-      cellKey.className = 'cpuInlineCell';
-      const inp = makeCpuKeyInput();
-      cellKey.appendChild(inp);
-      rowKey.append(headKey, cellKey);
-      box.append(rowTag, rowKey);
-    }else{
-      const cpuTag = document.createElement('div');
-      cpuTag.className = 'cpuInlineTitle';
-      cpuTag.textContent = '★CPU';
-      const cpuValue = document.createElement('div');
-      cpuValue.className = 'cpuInlineValue';
-      cpuValue.appendChild(makeCpuKeyInput());
-      box.append(cpuTag, cpuValue);
-    }
+    const rowKey = document.createElement('div');
+    rowKey.className = 'cpuInlineRow';
+    const headKey = document.createElement('div');
+    headKey.className = 'cpuInlineHead';
+    headKey.textContent = 'キー';
+    const cellKey = document.createElement('div');
+    cellKey.className = 'cpuInlineCell';
+    const inp = makeCpuKeyInput();
+    cellKey.appendChild(inp);
+    rowKey.append(headKey, cellKey);
+    box.append(rowTag, rowKey);
+
     wrap.appendChild(box);
     return wrap;
   }
@@ -551,6 +551,7 @@
   function makeCpuKeyInput(){
     const inp = document.createElement('input');
     inp.className = 'cellInp cpuKeyInp';
+    inp.dataset.cpuKey = '1';
     inp.maxLength = 2;
     inp.autocomplete = 'off';
     inp.value = state.cpuKey || '';
@@ -569,7 +570,7 @@
     const top = document.createElement('div');
     top.className = shouldLeftAlignLabel(getTeamName(i)) ? 'badgeTop left' : 'badgeTop';
     top.textContent = getTeamName(i);
-    const bg = hasColorSelect() ? (state.teams[i].color || '') : teamAutoColor(i);
+    const bg = isNoAutoColorMode() ? '' : (hasColorSelect() ? (state.teams[i].color || '') : teamAutoColor(i));
     if(bg){ top.style.background = bg; top.style.color = '#000'; }
     const bot = document.createElement('div');
     bot.className = 'badgeBot';
@@ -728,7 +729,7 @@
         label = raw;
       }else{
         label = getTeamName(idx);
-        bg = hasColorSelect() ? (state.teams[idx].color || '') : teamAutoColor(idx);
+        bg = isNoAutoColorMode() ? '' : (hasColorSelect() ? (state.teams[idx].color || '') : teamAutoColor(idx));
         left = shouldLeftAlignLabel(label);
       }
     }
@@ -782,25 +783,30 @@
   function buildRankTable(){
     rankWrap.innerHTML = '';
     const points = getPoints();
-    const title = document.createElement('div');
-    title.className = 'raceCountTitle';
-    title.textContent = 'レース数';
-    rankWrap.appendChild(title);
 
     const table = document.createElement('table');
     table.className = 'rankTable';
     const thead = document.createElement('thead');
+    const trTop = document.createElement('tr');
     const trh = document.createElement('tr');
 
     const thRank = document.createElement('th');
     thRank.className = 'rankHeadTd rankNoHead';
     thRank.textContent = '順位';
-    trh.appendChild(thRank);
+    thRank.rowSpan = 2;
+    trTop.appendChild(thRank);
 
     const thPts = document.createElement('th');
     thPts.className = 'rankHeadTd scoreHead';
     thPts.textContent = '得点';
-    trh.appendChild(thPts);
+    thPts.rowSpan = 2;
+    trTop.appendChild(thPts);
+
+    const thRaceCount = document.createElement('th');
+    thRaceCount.className = 'rankHeadTd raceCountHead';
+    thRaceCount.colSpan = state.races;
+    thRaceCount.textContent = 'レース数';
+    trTop.appendChild(thRaceCount);
 
     for(let r=0;r<state.races;r++){
       const th = document.createElement('th');
@@ -809,7 +815,7 @@
       th.textContent = String(r + 1);
       trh.appendChild(th);
     }
-    thead.appendChild(trh);
+    thead.append(trTop, trh);
     table.appendChild(thead);
 
     const tbody = document.createElement('tbody');
@@ -851,7 +857,12 @@
           state.cells[r][p] = v;
           disableRecoveryByInput();
           updateRankCellDisplay(td,r,p);
+          autoFillSingleMissingTeam(r);
           await runCalcAfterRankInput();
+          if(v && p < state.players - 1){
+            const nextInp = rankWrap.querySelector(`input.rankKey[data-race="${r}"][data-pos="${p + 1}"]`);
+            if(nextInp && !nextInp.disabled) nextInp.focus();
+          }
           scheduleSave();
         });
         const disp = document.createElement('div');
@@ -876,7 +887,6 @@
       const div = document.createElement('div');
       div.className = 'raceErrorText';
       div.dataset.race = String(r);
-      if(r === 7) div.classList.add('raceSplit');
       errorRow.appendChild(div);
     }
     rankWrap.appendChild(errorRow);
@@ -921,9 +931,9 @@
     for(let r=0;r<state.races;r++){
       const cell = document.createElement('div');
       cell.className = 'lockCell';
-      if(r === 7) cell.classList.add('raceSplit');
       const btn = document.createElement('button');
       btn.type = 'button';
+      btn.tabIndex = -1;
       btn.className = 'lockBtn';
       btn.dataset.race = String(r);
       btn.textContent = state.locks[r] ? '🔒' : '🔓';
@@ -939,6 +949,85 @@
     rankWrap.appendChild(lockRow);
     rebuildRankDisplays();
     applyLocks();
+    setTabOrder();
+  }
+
+  function autoFillSingleMissingTeam(r){
+    const count = teamCount();
+    const keyMap = getKeyMap();
+    const requiredPerTeam = Math.floor(state.players / count);
+    const counts = Array(count).fill(0);
+    const emptyPositions = [];
+    let cpuCount = 0;
+    let invalid = false;
+
+    for(let p=0;p<state.players;p++){
+      const raw = String(state.cells?.[r]?.[p] ?? '').trim();
+      if(!raw){ emptyPositions.push(p); continue; }
+      if(state.cpuKey && raw === state.cpuKey){ cpuCount++; continue; }
+      const idx = keyMap.get(raw);
+      if(idx == null){ invalid = true; continue; }
+      counts[idx]++;
+    }
+
+    if(invalid || cpuCount > 0 || emptyPositions.length === 0) return false;
+    if(counts.some(c=> c > requiredPerTeam)) return false;
+    const shortages = counts.map(c=> requiredPerTeam - c);
+    const missingIndexes = shortages.map((v,i)=> v > 0 ? i : -1).filter(i=> i >= 0);
+    if(missingIndexes.length !== 1) return false;
+    const missingIdx = missingIndexes[0];
+    if(shortages[missingIdx] !== emptyPositions.length) return false;
+    const key = state.teams[missingIdx]?.key || '';
+    if(!key) return false;
+
+    if(!state.cells[r]) state.cells[r] = {};
+    for(const p of emptyPositions){
+      state.cells[r][p] = key;
+      const inp = rankWrap.querySelector(`input.rankKey[data-race="${r}"][data-pos="${p}"]`);
+      if(inp) inp.value = key;
+      const td = getRankTd(r,p);
+      if(td) updateRankCellDisplay(td,r,p);
+    }
+    return true;
+  }
+
+  function getTagTabRows(){
+    const count = teamCount();
+    const rows = splitTeamIndexes(count);
+    return rows;
+  }
+
+  function setTabOrder(){
+    document.querySelectorAll('button, select, input[type="radio"], input[type="checkbox"]').forEach(el=>{ el.tabIndex = -1; });
+    let tab = 1;
+    const rows = getTagTabRows();
+    const addTeamInputs = (cls, idxs)=>{
+      for(const i of idxs){
+        const el = tagTables.querySelector(`.${cls}[data-team-index="${i}"]`);
+        if(el) el.tabIndex = tab++;
+      }
+    };
+    for(const idxs of rows) addTeamInputs('tagNameInp', idxs);
+    if(rows.length === 1){
+      addTeamInputs('tagKeyInp', rows[0]);
+      const cpu = tagTables.querySelector('.cpuKeyInp');
+      if(cpu) cpu.tabIndex = tab++;
+    }else{
+      addTeamInputs('tagKeyInp', rows[0]);
+      const cpu = tagTables.querySelector('.cpuKeyInp');
+      if(cpu) cpu.tabIndex = tab++;
+      addTeamInputs('tagKeyInp', rows[1]);
+    }
+    for(const idxs of rows) addTeamInputs('tagAdjInp', idxs);
+
+    for(let r=0;r<state.races;r++){
+      for(let p=0;p<state.players;p++){
+        const inp = rankWrap.querySelector(`input.rankKey[data-race="${r}"][data-pos="${p}"]`);
+        if(inp) inp.tabIndex = tab++;
+      }
+      const course = rankWrap.querySelector(`input.courseInp[data-race="${r}"]`);
+      if(course) course.tabIndex = tab++;
+    }
   }
 
   function currentCompletedRaceCount(){
@@ -1150,7 +1239,7 @@
     })).sort((a,b)=> b.displayTotal - a.displayTotal || a.idx - b.idx);
     const completedRaces = Object.keys(raceScores).length;
     const remaining = clamp(state.races - completedRaces, 0, state.races);
-    return {ok:true, standings, remaining, courseLog, completedRaces};
+    return {ok:true, standings, remaining, courseLog, completedRaces, raceScores};
   }
 
   function formatDiff(baseTotal, otherTotal){
@@ -1205,6 +1294,38 @@
     });
   }
 
+  function resultTail(courseName, remaining){
+    let tail = `${courseName ? courseName : ''}@${remaining}`;
+    if(hasAnyAdjInput()) tail += ' (補正込)';
+    return tail;
+  }
+
+  function buildTwoTeamLine(res, baseIdx, courseName){
+    const standings = res.standings;
+    const base = standings.find(s=> s.idx === baseIdx);
+    const other = standings.find(s=> s.idx !== baseIdx);
+    if(!base || !other) return '';
+    let raceDiff = '±0';
+    const lastRace = res.completedRaces - 1;
+    if(lastRace >= 0 && res.raceScores?.[lastRace]){
+      const b = safeParseInt(res.raceScores[lastRace][base.idx]);
+      const o = safeParseInt(res.raceScores[lastRace][other.idx]);
+      raceDiff = formatDiff(b, o);
+    }
+    const totalDiff = formatDiff(base.displayTotal, other.displayTotal);
+    const parts = [
+      raceDiff,
+      `合計: ${base.name} ${base.displayTotal}-${other.displayTotal} ${other.name}`,
+      `点差: ${totalDiff}`,
+      resultTail(courseName, res.remaining)
+    ];
+    if(state.showCert){
+      const cert = buildCertTextForBase(standings, res.remaining, baseIdx);
+      if(cert) parts.push(cert);
+    }
+    return parts.join('／');
+  }
+
   function buildStandardLine(standings, remaining, baseIdx, courseName){
     const base = standings.find(s=> s.idx === baseIdx);
     if(!base) return '';
@@ -1219,9 +1340,7 @@
       }
     }
     parts.push(rankLabelFor(standings, baseIdx, remaining));
-    if(courseName) parts.push(courseName);
-    parts.push(`＠${remaining}`);
-    if(hasAnyAdjInput()) parts.push('(補正込)');
+    parts.push(resultTail(courseName, remaining));
     if(state.showCert){
       const cert = buildCertTextForBase(standings, remaining, baseIdx);
       if(cert) parts.push(cert);
@@ -1231,9 +1350,7 @@
 
   function buildSumOnlyLine(standings, remaining, courseName){
     const parts = standings.map(s=> `${s.name} ${s.displayTotal}`);
-    if(courseName) parts.push(courseName);
-    parts.push(`＠${remaining}`);
-    if(hasAnyAdjInput()) parts.push('(補正込)');
+    parts.push(resultTail(courseName, remaining));
     return parts.join('／');
   }
 
@@ -1248,7 +1365,7 @@
     const courseName = getLastCompletedCourse(res.courseLog, res.completedRaces);
     const main = state.dispMode === 'sumOnly'
       ? buildSumOnlyLine(res.standings, res.remaining, courseName)
-      : buildStandardLine(res.standings, res.remaining, currentMainBaseIdx(), courseName);
+      : (teamCount() === 2 ? buildTwoTeamLine(res, currentMainBaseIdx(), courseName) : buildStandardLine(res.standings, res.remaining, currentMainBaseIdx(), courseName));
     outMain.textContent = main;
     renderOptFromResult(res, courseName);
     renderAdjLog();
@@ -1273,7 +1390,7 @@
       outOpt.textContent = '';
       return;
     }
-    outOpt.textContent = buildStandardLine(res.standings, res.remaining, baseIdx, courseName);
+    outOpt.textContent = teamCount() === 2 ? buildTwoTeamLine(res, baseIdx, courseName) : buildStandardLine(res.standings, res.remaining, baseIdx, courseName);
   }
 
   async function runCalcAfterRankInput(){
@@ -1315,18 +1432,15 @@
   }
 
   function pruneInputs(){
-    const newCells = {};
-    for(let r=0;r<state.races;r++){
-      newCells[r] = {};
-      for(let p=0;p<state.players;p++) newCells[r][p] = state.cells?.[r]?.[p] ?? '';
+    if(!state.cells || typeof state.cells !== 'object') state.cells = {};
+    if(!state.courses || typeof state.courses !== 'object') state.courses = {};
+    if(!state.locks || typeof state.locks !== 'object') state.locks = {};
+    for(let r=0;r<12;r++){
+      if(!state.cells[r]) state.cells[r] = {};
+      for(let p=0;p<24;p++) if(state.cells[r][p] == null) state.cells[r][p] = '';
+      if(state.courses[r] == null) state.courses[r] = '';
+      state.locks[r] = !!state.locks[r];
     }
-    state.cells = newCells;
-    const newCourses = {};
-    for(let r=0;r<state.races;r++) newCourses[r] = state.courses?.[r] ?? '';
-    state.courses = newCourses;
-    const newLocks = {};
-    for(let r=0;r<state.races;r++) newLocks[r] = !!state.locks?.[r];
-    state.locks = newLocks;
   }
 
   function refreshTagOnly(){
@@ -1444,6 +1558,17 @@
   function openModal(){ modalSpec.classList.remove('hidden'); modalSpec.setAttribute('aria-hidden','false'); }
   function closeModal(){ modalSpec.classList.add('hidden'); modalSpec.setAttribute('aria-hidden','true'); }
 
+  function setupResetButtonPress(buttons){
+    buttons.forEach(btn=>{
+      const press = ()=>{
+        btn.classList.add('isPressing');
+        setTimeout(()=> btn.classList.remove('isPressing'), 100);
+      };
+      btn.addEventListener('pointerdown', press);
+      btn.addEventListener('keydown', e=>{ if(e.key === 'Enter' || e.key === ' ') press(); });
+    });
+  }
+
   function initControls(){
     document.querySelectorAll('input[name="players"]').forEach(r=>{
       r.checked = Number(r.value) === state.players;
@@ -1491,6 +1616,7 @@
     btnResetTags.addEventListener('click', resetTags);
     btnResetAll.addEventListener('click', resetAll);
     btnRecovery.addEventListener('click', recoverReset);
+    setupResetButtonPress([btnResetTags, btnResetAll, btnRecovery]);
     btnCopyMain.addEventListener('click', async ()=>{ await copyText(outMain.textContent); });
     btnCopyOpt.addEventListener('click', async ()=>{ await copyText(outOpt.textContent); });
 
@@ -1522,6 +1648,7 @@
     btnSpec.addEventListener('click', openModal);
     btnSpecClose.addEventListener('click', closeModal);
     modalSpec.querySelector('.modalBack')?.addEventListener('click', closeModal);
+    setTabOrder();
   }
 
   function init(){
@@ -1539,6 +1666,7 @@
     renderAdjLog();
     renderCourseLog(state.courses);
     updateRecoveryButton();
+    setTabOrder();
     runCalcByCurrentValidState(false).then(()=>{
       suppressNewRaceCheck = false;
       state.lastUpdated = state.lastUpdated || nowMs();
