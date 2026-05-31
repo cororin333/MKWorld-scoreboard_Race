@@ -367,6 +367,12 @@
     });
   }
 
+  function autoAlignCourseInput(inp){
+    requestAnimationFrame(()=>{
+      inp.classList.toggle('left', inp.scrollWidth > inp.clientWidth + 1);
+    });
+  }
+
   function colorDisplay(color){
     return SELECT_COLORS.find(c=> c.color === color)?.name || '未選択';
   }
@@ -889,18 +895,10 @@
             scheduleSave();
             return;
           }
-          if(current && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey){
-            e.preventDefault();
-          }
         });
         inp.addEventListener('input', async ()=>{
           checkNewRaceInputAfterFinish();
-          const before = String(state.cells?.[r]?.[p] ?? '').trim();
           let v = normalizeKey(inp.value);
-          if(before && before !== v){
-            inp.value = before;
-            return;
-          }
           if(inp.value !== v) inp.value = v;
           if(!state.cells[r]) state.cells[r] = {};
           state.cells[r][p] = v;
@@ -957,9 +955,11 @@
       inp.autocomplete = 'off';
       inp.value = state.courses?.[r] ?? '';
       inp.dataset.race = String(r);
+      autoAlignCourseInput(inp);
       inp.addEventListener('input', async ()=>{
         checkNewRaceInputAfterFinish();
         state.courses[r] = inp.value;
+        autoAlignCourseInput(inp);
         disableRecoveryByInput();
         renderCourseLog(state.courses);
         const res = calcStandings();
