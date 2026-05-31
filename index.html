@@ -12,7 +12,7 @@
     <header class="header">
       <div class="titleRow">
         <h1 class="title">MKWorld即時集計表</h1>
-        <button id="btnSpec" class="pill" tabindex="-1">サイト仕様書</button>
+        <button id="btnSpec" class="pill btnPressAction" tabindex="-1">サイトの使い方</button>
       </div>
     </header>
 
@@ -77,7 +77,7 @@
         <div class="cardHead">
           <div class="cardTitleRow">
             <div class="cardTitle">順位入力</div>
-            <button id="btnPin" class="btn" tabindex="-1">タグ固定</button>
+            <button id="btnPin" class="btn btnPressAction" tabindex="-1">タグ固定</button>
           </div>
           <div class="cardActions resetActionStack">
             <button id="btnResetAll" class="btn btnResetAction" tabindex="-1">Reset</button>
@@ -96,7 +96,8 @@
         <div id="rankWrap" class="rankWrap"></div>
       </section>
 
-      <section class="card cardLast">
+      <section class="card cardLast resultCard">
+        <div class="resultGroup resultGroupMain">
         <div class="cardHead">
           <div class="cardTitleRow">
             <div class="cardTitle">集計結果</div>
@@ -126,10 +127,13 @@
           </div>
         </div>
 
+        </div>
+
         <div class="divider"></div>
 
+        <div class="resultGroup resultGroupOther">
         <div class="optionRow">
-          <div class="optTitle">集計オプション</div>
+          <div class="optTitle">他チームの集計結果</div>
           <button id="btnCopyOpt" class="btn btnCopyAction" tabindex="-1">copy</button>
           <select id="selView" class="sel"></select>
         </div>
@@ -138,8 +142,11 @@
           <div id="outOpt" class="outLine outWrap"></div>
         </div>
 
+        </div>
+
         <div class="divider"></div>
 
+        <div class="resultGroup resultGroupLogs">
         <div class="logBlock">
           <div class="logTitle">点数補正ログ</div>
           <div id="logAdj" class="log"></div>
@@ -149,6 +156,7 @@
           <div class="logTitle">コース選択ログ</div>
           <label class="chk small"><input id="chkShowCourseLog" type="checkbox">表示</label>
           <div id="logCourse" class="log"></div>
+        </div>
         </div>
       </section>
     </main>
@@ -165,7 +173,7 @@
     <div class="modalBack"></div>
     <div class="modalBox">
       <div class="modalHead">
-        <div class="modalTitle">サイト仕様書</div>
+        <div class="modalTitle">サイトの使い方</div>
         <button id="btnSpecClose" class="pinClose" aria-label="閉じる" tabindex="-1">×</button>
       </div>
       <div class="modalBody">
