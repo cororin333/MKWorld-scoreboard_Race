@@ -97,36 +97,33 @@
       </section>
 
       <section class="card cardLast resultCard">
-        <div class="resultGroup resultGroupMain">
-        <div class="cardHead">
+        <div class="cardHead resultMainHead">
           <div class="cardTitleRow">
             <div class="cardTitle">集計結果</div>
+            <button id="btnCopyMain" class="btn btnCopyAction" tabindex="-1">copy</button>
             <span id="copyStatusMsg" class="copyStatusMsg" aria-live="polite"></span>
           </div>
-          <div class="cardActions">
-            <button id="btnCopyMain" class="btn btnCopyAction" tabindex="-1">copy</button>
+        </div>
+
+        <div class="resultMainPlain">
+          <div class="copyLine">
+            <div id="outMain" class="outLine outWrap" title="コピペ用"></div>
           </div>
-        </div>
 
-        <div class="copyLine">
-          <div id="outMain" class="outLine outWrap" title="コピペ用"></div>
-        </div>
-
-        <div class="optionRow">
-          <div class="optTitle">表示オプション</div>
-          <div class="displayOptionBlock">
-            <div class="displayOptionLine">
-              <label class="radio"><input type="radio" name="dispMode" value="normal" checked>点差のみ</label>
-              <label class="chk"><input id="chkShowSum" type="checkbox">合計点</label>
-              <label class="chk"><input id="chkShowCert" type="checkbox">勝ち確表示</label>
-              <span id="certText" class="certText"></span>
-            </div>
-            <div class="displayOptionLine">
-              <label class="radio"><input type="radio" name="dispMode" value="sumOnly">合計点のみ(順位計算なし)</label>
+          <div class="optionRow">
+            <div class="optTitle">表示オプション</div>
+            <div class="displayOptionBlock">
+              <div class="displayOptionLine">
+                <label class="radio"><input type="radio" name="dispMode" value="normal" checked>点差のみ</label>
+                <label class="chk"><input id="chkShowSum" type="checkbox">合計点</label>
+                <label class="chk"><input id="chkShowCert" type="checkbox">勝ち確表示</label>
+                <span id="certText" class="certText"></span>
+              </div>
+              <div class="displayOptionLine">
+                <label class="radio"><input type="radio" name="dispMode" value="sumOnly">合計点のみ(順位計算なし)</label>
+              </div>
             </div>
           </div>
-        </div>
-
         </div>
 
         <div class="divider"></div>
