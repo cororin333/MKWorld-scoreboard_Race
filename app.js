@@ -172,6 +172,7 @@
       outMain: outMain.textContent || '',
       outOpt: outOpt.textContent || '',
       finishedAt: state.finishedAt,
+      qualify: state.qualify,
     };
   }
 
@@ -282,7 +283,7 @@
   }
 
   function shouldLeftAlignLabel(text){
-    return String(text ?? '').trim().length >= 6;
+    return String(text ?? '').trim().length >= 4;
   }
 
   function updateLabelAlignment(el){
@@ -580,6 +581,7 @@
     top.textContent = getTeamName(i);
     const bg = isNoAutoColorMode() ? '' : (hasColorSelect() ? (state.teams[i].color || '') : teamAutoColor(i));
     if(bg){ top.style.background = bg; top.style.color = '#000'; }
+    if(isNoAutoColorMode()) top.classList.add('noAutoColor');
     updateLabelAlignment(top);
     const bot = document.createElement('div');
     bot.className = 'badgeBot';
@@ -789,6 +791,16 @@
   function clearRaceErrors(){
     rankWrap.querySelectorAll('.raceErrorText').forEach(el=> el.textContent = '');
     rankWrap.querySelectorAll('.raceCellTd').forEach(td=> td.classList.remove('raceError'));
+  }
+
+
+  async function updateLatestCourseResultIfNeeded(r){
+    const completed = currentCompletedRaceCount();
+    if(completed <= 0) return false;
+    const latest = completed - 1;
+    if(r !== latest) return false;
+    if(!allCellsFilled(r) || !isRaceValidForCalc(r).ok) return false;
+    return await recalcAndRender(true);
   }
 
   function buildRankTable(){
@@ -1665,7 +1677,7 @@
     btnResetTags.addEventListener('click', resetTags);
     btnResetAll.addEventListener('click', resetAll);
     btnRecovery.addEventListener('click', recoverReset);
-    setupResetButtonPress([btnResetTags, btnResetAll, btnRecovery, btnCopyMain, btnCopyOpt]);
+    setupResetButtonPress([btnResetTags, btnResetAll, btnRecovery, btnCopyMain, btnCopyOpt, btnPin, btnSpec]);
     btnCopyMain.addEventListener('click', async ()=>{ await copyText(outMain.textContent); });
     btnCopyOpt.addEventListener('click', async ()=>{ await copyText(outOpt.textContent); });
 
