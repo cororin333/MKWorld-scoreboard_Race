@@ -12,7 +12,7 @@
     <header class="header">
       <div class="titleRow">
         <h1 class="title">MKWorld即時集計表</h1>
-        <button id="btnSpec" class="pill btnPressAction" tabindex="-1">サイトの使い方</button>
+        <button id="btnSpec" class="pill btnPressAction" tabindex=\"-1\">サイトの使い方</button>
       </div>
     </header>
 
@@ -25,8 +25,8 @@
           <div class="ruleCol">
             <div class="ruleLine">
               <span class="label">対戦人数</span>
-              <label class="radio"><input type="radio" name="players" value="12">12人制</label>
-              <label class="radio"><input type="radio" name="players" value="24" checked>24人制</label>
+              <label class="radio"><input type="radio\" name="players" value="12">12人制</label>
+              <label class="radio"><input type="radio\" name="players" value="24" checked>24人制</label>
             </div>
             <div class="ruleLine">
               <span class="label">対戦形式</span>
@@ -34,22 +34,31 @@
             </div>
             <div class="ruleLine">
               <span class="label">レース数</span>
-              <label class="radio"><input type="radio" name="races" value="8">8</label>
-              <label class="radio"><input type="radio" name="races" value="12" checked>12</label>
+              <label class="radio"><input type="radio\" name="races" value="12" checked>12</label>
+              <label class="radio"><input type="radio\" name="races" value="16">16</label>
+              <label class="radio"><input type="radio\" name="races" value="24">24</label>
+              <label class="radio"><input type="radio\" name="races" value="32">32</label>
+              <label class="radio"><input type="radio\" name="races" value="48">48</label>
             </div>
           </div>
-
           <div class="ruleCol">
             <div class="ruleLine">
-              <span class="label">通過組数</span>
-              <input id="inpQualify" class="inp small" inputmode="numeric" autocomplete="off" tabindex="-1" />
+              <span class="label">補正係数</span>
+              <input id="inpK" class="inp small" type="text" value="0" maxlength="4" autocomplete="off">
+              <span class="smallLine">※少数可・マイナス可</span>
             </div>
             <div class="ruleLine">
-              <span class="label">CPU加算</span>
+              <span class="label">CPU</span>
               <div class="cpuBox">
-                <label class="radio"><input type="radio" name="cpuCalc" value="MKB" checked>MKBルール</label>
-                <label class="radio"><input type="radio" name="cpuCalc" value="SUMMIT">SUMMITルール</label>
+                <label class="chk"><input id="chkCpu" type="checkbox">CPUを含める</label>
+                <div id="cpuNumWrap" class="hidden">
+                  <select id="selCpuNum" class="sel"></select>
+                </div>
               </div>
+            </div>
+            <div class="ruleLine">
+              <span class="label">色自動割当</span>
+              <label class="chk"><input id="chkAutoColor" type="checkbox" checked>順位表のタグに自動で色を付ける</label>
             </div>
           </div>
         </div>
@@ -59,113 +68,114 @@
         <div class="cardHead">
           <div class="cardTitleRow">
             <div class="cardTitle">タグ設定</div>
-            <span id="dupKeyMsg" class="errInline" aria-live="polite"></span>
-          </div>
-          <div class="cardActions">
-            <button id="btnResetTags" class="btn btnResetAction" tabindex="-1">Reset Tags</button>
+            <div id="tagErr" class="errInline"></div>
           </div>
         </div>
 
         <div class="tagWrap">
-          <div class="tagTableWrap">
-            <div id="tagTables" class="tagTables" aria-label="タグ設定"></div>
+          <div id="tagMainRow" class="tagMainRow colorOn">
+            <div id="tagTablesCol" class="tagTablesCol"></div>
+            <div id="cpuInlineSection" class="cpuInlineWrap hidden"></div>
           </div>
         </div>
       </section>
 
       <section class="card rankCard">
         <div class="cardHead">
-          <div class="cardTitleRow">
-            <div class="cardTitle">順位入力</div>
-            <button id="btnPin" class="btn btnPressAction" tabindex="-1">タグ固定</button>
-          </div>
+          <div class="cardTitle">順位表</div>
           <div class="cardActions resetActionStack">
-            <button id="btnResetAll" class="btn btnResetAction" tabindex="-1">Reset</button>
-            <button id="btnRecovery" class="btn btnRecovery btnResetAction" tabindex="-1" disabled>Recovery</button>
+            <button id="btnPin" class="btn btnPressAction" tabindex="-1">ピン留め</button>
+            <button id="btnRecovery" class="btn btnRecovery" disabled tabindex="-1">データ復旧</button>
+            <button id="btnReset" class="btn btnResetAction" tabindex="-1">リセット</button>
           </div>
         </div>
 
-        <div class="pinRow">
-          <div id="pinPreview" class="pinPreview" aria-label="タグ見本"></div>
-        </div>
-
-        <div class="smallLine smallLineTight">
-          <span>1レース最大点差：<span id="spMaxDiff">--</span>点</span>
+        <div id="pinPreviewRow" class="pinRow hidden">
+          <div class="smallLine smallLineTight">ピン留めプレビュー</div>
+          <div id="pinPreview" class="pinPreview"></div>
         </div>
 
         <div id="rankWrap" class="rankWrap"></div>
+        <div id="rankErr" class="errInline"></div>
+        <div class="smallLine">※各マスの入力は半角英数字（大文字小文字不問）のタグキー、または直接数字を入力してください。</div>
       </section>
 
-      <section class="card cardLast resultCard">
-        <div class="cardHead resultMainHead">
-          <div class="cardTitleRow">
-            <div class="cardTitle">集計結果</div>
-            <button id="btnCopyMain" class="btn btnCopyAction" tabindex="-1">copy</button>
-            <span id="copyStatusMsg" class="copyStatusMsg" aria-live="polite"></span>
+      <section class="card cardLast">
+        <div class="cardHead">
+          <div class="cardTitle">集計結果</div>
+          <div class="cardActions">
+            <div id="copyMsg" class="copyStatusMsg"></div>
           </div>
+        </div>
+
+        <div class="resultGroup resultGroupOther">
+        <div class="resultMainHead">
+          <button id="btnCopyPlain" class="btn btnCopyAction" tabindex="-1">copy</button>
+          <span id="certText" class="certText hidden">【★交流戦申請用★ 100%確定版】</span>
         </div>
 
         <div class="resultMainPlain">
           <div class="copyLine">
-            <div id="outMain" class="outLine outWrap" title="コピペ用"></div>
+            <div class="optTitle">形式に合わせた集計</div>
+            <div id="outPlain" class="outLine outWrap"></div>
           </div>
-
-          <div class="optionRow">
-            <div class="optTitle">表示オプション</div>
-            <div class="displayOptionBlock">
-              <div class="displayOptionLine">
-                <label class="radio"><input type="radio" name="dispMode" value="normal" checked>点差のみ</label>
-                <label class="chk"><input id="chkShowSum" type="checkbox">合計点</label>
-                <label class="chk"><input id="chkShowCert" type="checkbox">勝ち確表示</label>
-                <span id="certText" class="certText"></span>
-              </div>
-              <div class="displayOptionLine">
-                <label class="radio"><input type="radio" name="dispMode" value="sumOnly">合計点のみ(順位計算なし)</label>
-              </div>
-            </div>
+          <div class="copyLine">
+            <div class="optTitle">最高得点者</div>
+            <div id="outMVP" class="outLine outWrap"></div>
           </div>
+          <div class="copyLine">
+            <div class="optTitle">進行用</div>
+            <div id="outProg" class="outLine outWrap"></div>
+          </div>
+        </div>
         </div>
 
         <div class="divider"></div>
 
-        <div class="resultGroup resultGroupOther">
-          <div class="optionRow">
-            <div class="optTitle">他チームの集計結果</div>
-            <button id="btnCopyOpt" class="btn btnCopyAction" tabindex="-1">copy</button>
-            <select id="selView" class="sel"></select>
-          </div>
+        <div class="displayOptionBlock">
+        <div class="displayOptionLine">
+          <label class="chk"><input id="chkShowTeamScore" type="checkbox" checked>各チームの合計点を表示</label>
+          <label class="chk"><input id="chkShowIndiv" type="checkbox" checked>個人の総合順位・得点を表示</label>
+          <label class="chk"><input id="chkShowCert" type="checkbox">確定版タグを表示</label>
+        </div>
 
-          <div class="copyLine">
-            <div id="outOpt" class="outLine outWrap"></div>
-          </div>
+        <div class="optionRow">
+          <button id="btnCopyOpt" class="btn btnCopyAction" tabindex="-1">copy</button>
+          <select id="selView" class="sel"></select>
+        </div>
+
+        <div class="copyLine">
+          <div id="outOpt" class="outLine outWrap"></div>
+        </div>
+
         </div>
 
         <div class="divider"></div>
 
         <div class="resultGroup resultGroupLogs">
-          <div class="logBlock">
-            <div class="logTitle">点数補正ログ</div>
-            <div id="logAdj" class="log"></div>
-          </div>
+        <div class="logBlock">
+          <div class="logTitle">点数補正ログ</div>
+          <div id="logAdj" class="log"></div>
+        </div>
 
-          <div class="logBlock">
-            <div class="logTitle">コース選択ログ</div>
-            <label class="chk small"><input id="chkShowCourseLog" type="checkbox">表示</label>
-            <div id="logCourse" class="log"></div>
-          </div>
+        <div class="logBlock">
+          <div class="logTitle">コース選択ログ</div>
+          <label class="chk small"><input id="chkShowCourseLog" type="checkbox">表示</label>
+          <div id="logCourse" class="log"></div>
+        </div>
         </div>
       </section>
     </main>
   </div>
 
-  <div id="pinBar" class="pinBar hidden" aria-hidden="true">
+  <div id=\"pinBar\" class=\"pinBar hidden\" aria-hidden=\"true\">
     <div class="pinBarInner">
       <div id="pinBarContent" class="pinBarContent"></div>
       <button id="btnPinClose" class="pinClose" aria-label="閉じる" tabindex="-1">×</button>
     </div>
   </div>
 
-  <div id="modalSpec" class="modal hidden" aria-hidden="true">
+  <div id="modalSpec" class="modal hidden" aria-hidden="true\">
     <div class="modalBack"></div>
     <div class="modalBox">
       <div class="modalHead">
@@ -173,7 +183,7 @@
         <button id="btnSpecClose" class="pinClose" aria-label="閉じる" tabindex="-1">×</button>
       </div>
       <div class="modalBody">
-        <div class="specText">準備中</div>
+        <div id="specText" class="specText"></div>
       </div>
     </div>
   </div>
