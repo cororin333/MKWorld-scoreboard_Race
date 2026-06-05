@@ -1,4 +1,4 @@
-(()=> {
+(() => {
   'use strict';
 
   const VERSION = 'mkworld_complete_20260530';
@@ -6,7 +6,13 @@
   const MAX_TEAMS = 24;
   const FINISHED_TTL_MS = 24 * 60 * 60 * 1000;
 
-  const SELECT_COLORS = [\n    {name:'未選択', display:'', color:''},\n    {name:'🔴赤', display:'🔴', color:'#FE3C4F'},\n    {name:'🔵青', display:'🔵', color:'#498CF0'},\n    {name:'🟡黄', display:'🟡', color:'#FFF200'},\n    {name:'🟢緑', display:'🟢', color:'#57C544'},\n  ];
+  const SELECT_COLORS = [
+    {name:'未選択', display:'', color:''},
+    {name:'🔴赤', display:'🔴', color:'#FE3C4F'},
+    {name:'🔵青', display:'🔵', color:'#498CF0'},
+    {name:'🟡黄', display:'🟡', color:'#FFF200'},
+    {name:'🟢緑', display:'🟢', color:'#57C544'}
+  ];
 
   const AUTO_COLORS = [
     '#FE3C4F', '#498CF0', '#FFF200', '#57C544',
@@ -263,7 +269,7 @@
           buildOptViewOptions();
           buildRankTable();
           renderPinPreview();
-          spMaxDiff.textContent = String(MAXDIFF[state.players][state.mode] ?? '--');
+          if(spMaxDiff) spMaxDiff.textContent = String(MAXDIFF[state.players][state.mode] ?? '--');
           await runCalcByCurrentValidState(true);
           scheduleSave();
         }
@@ -298,7 +304,7 @@
       buildOptViewOptions();
       buildRankTable();
       renderPinPreview();
-      spMaxDiff.textContent = String(MAXDIFF[state.players][state.mode] ?? '--');
+      if(spMaxDiff) spMaxDiff.textContent = String(MAXDIFF[state.players][state.mode] ?? '--');
       await runCalcByCurrentValidState(true);
       scheduleSave();
     });
@@ -377,7 +383,7 @@
     buildOptViewOptions();
     buildRankTable();
     renderPinPreview();
-    spMaxDiff.textContent = String(MAXDIFF[state.players][state.mode] ?? '--');
+    if(spMaxDiff) spMaxDiff.textContent = String(MAXDIFF[state.players][state.mode] ?? '--');
     renderAdjLog();
     renderCourseLog(state.courses);
     updateRecoveryButton();
