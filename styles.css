@@ -97,21 +97,21 @@ body{margin:0;font-family:var(--fontThin);font-size:14px;color:var(--text);backg
 .modalBody p:last-child{margin-bottom:0;}
 .hidden{display:none !important;}
 :focus-visible{outline:2px solid #0055ff;outline-offset:1px;}
-.tblTagCellName input{text-align:left;}
-.tblTagCellColor select{font-weight:700;}
-.rankCard .cardHead{margin-bottom:10px;}
-.cardTitle{background:#111;color:#fff;width:136px;min-width:136px;height:38px;text-align:center;}
-.ruleCol{background:var(--resultGray);}
-.resultGroup{background:var(--resultGray);}
-.resultMainPlain{margin:10px 0;box-sizing:border-box;}
-.resultMainHead{margin-bottom:10px;}
-.resultGroupOther .optTitle,.resultGroupLogs .logTitle{background:var(--subHeadGray);color:#fff;}
-.resultMainPlain .optTitle{background:transparent;color:#111;min-width:140px;padding-left:0;padding-right:0;justify-content:flex-start;}
-.outLine{background:transparent;border:0;border-radius:0;padding:0 0 0 8px;min-height:18px;}
-.log{padding-left:8px;}
-.cardActions.resetActionStack{flex-direction:row;align-items:center;justify-content:flex-end;gap:8px;}
-.btnResetAction,.btnPressAction{height:28px;min-height:28px;box-sizing:border-box;}
-#btnPin{height:28px;}
-.rowHead{border-right:var(--bMid) solid #000 !important;}
-.raceErrorLead.rankLead,.lockLead.rankLead,.raceErrorLead.scoreLead,.lockLead.scoreLead{background:transparent;}
-.raceCellTd{background-color:transparent;}
+.tblTagCellName input { text-align: left; }
+.tblTagCellColor select { font-weight: 700; }
+.rankCard .cardHead { margin-bottom: 10px; }
+.cardTitle { background: #111; color: #fff; width: 136px; min-width: 136px; height: 38px; text-align: center; }
+.ruleCol { background: var(--resultGray); }
+.resultGroup { background: var(--resultGray); }
+.resultMainPlain { margin: 10px 0; box-sizing: border-box; }
+.resultMainHead { margin-bottom: 10px; }
+.resultGroupOther .optTitle, .resultGroupLogs .logTitle { background: var(--subHeadGray); color: #fff; }
+.resultMainPlain .optTitle { background: transparent; color: #111; min-width: 140px; padding-left: 0; padding-right: 0; justify-content: flex-start; }
+.outLine { background: transparent; border: 0; border-radius: 0; padding: 0 0 0 8px; min-height: 18px; }
+.log { padding-left: 8px; }
+.cardActions.resetActionStack { flex-direction: row; align-items: center; justify-content: flex-end; gap: 8px; }
+.btnResetAction, .btnPressAction { height: 28px; min-height: 28px; box-sizing: border-box; }
+#btnPin { height: 28px; }
+.rowHead { border-right: var(--bMid) solid #000 !important; }
+.raceErrorLead.rankLead, .lockLead.rankLead, .raceErrorLead.scoreLead, .lockLead.scoreLead { background: transparent; }
+.raceCellTd { background-color: transparent; }
