@@ -173,4 +173,32 @@ body{margin:0;font-family:var(--fontThin);font-size:14px;color:var(--text);backg
 .rankDisp{line-height:1;}
 .rankCell{display:flex;align-items:stretch;justify-content:stretch;}
 .rankKey,.rankDisp{line-height:1;}
+:root{--tagw:60px;--resultGray:#e6e6e6;--subHeadGray:#808080;}
+.card{padding:14px 27px 16px;}
+.rankCard{padding-top:14px;}
+.rankCard .cardHead{margin-bottom:10px;}
+.cardTitle{background:#111;color:#fff;width:136px;min-width:136px;height:38px;text-align:center;}
+.ruleCol{background:var(--resultGray);}
+.resultGroup{background:var(--resultGray);}
+.resultMainPlain{margin:10px 0;box-sizing:border-box;}
+.resultMainHead{margin-bottom:10px;}
+.resultGroupOther .optTitle,.resultGroupLogs .logTitle{background:var(--subHeadGray);color:#fff;}
+.resultMainPlain .optTitle{background:transparent;color:#111;min-width:140px;padding-left:0;padding-right:0;justify-content:flex-start;}
+.outLine{background:transparent;border:0;border-radius:0;padding:0 0 0 8px;min-height:18px;}
+.log{padding-left:8px;}
+.cardActions.resetActionStack{flex-direction:row;align-items:center;justify-content:flex-end;gap:8px;}
+.btnResetAction,.btnPressAction{height:28px;min-height:28px;box-sizing:border-box;}
+#btnPin{height:28px;}
+.rowHead{border-right:var(--bMid) solid #000 !important;}
+.raceErrorLead.rankLead,.lockLead.rankLead,.raceErrorLead.scoreLead,.lockLead.scoreLead{background:transparent;}
+.raceCellTd{background-clip:border-box;}
+.rankDisp{inset:0;}
+.courseInp{text-align:center;}
+.courseInp.left{text-align:left;}
+.pinBarInner{position:relative;padding:6px 44px 38px 8px;}
+.pinClose{background:#111;}
+#btnPinClose{position:absolute;right:8px;bottom:6px;}
+.pinPreview,.pinBarContent{width:max-content;}
+.tagTableWrap,.rankWrap,.resultMainPlain,.resultGroup{margin-left:0;}
+.copyLine{margin:8px 0;}
 .resultGroupOther .copyLine{margin-top:8px;}
