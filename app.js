@@ -1,4 +1,4 @@
-(() => {
+(()=> {
   'use strict';
 
   const VERSION = 'mkworld_complete_20260530';
@@ -6,393 +6,42 @@
   const MAX_TEAMS = 24;
   const FINISHED_TTL_MS = 24 * 60 * 60 * 1000;
 
-  const SELECT_COLORS = [
-    {name:'未選択', display:'', color:''},
-    {name:'🔴赤', display:'🔴', color:'#FE3C4F'},
-    {name:'🔵青', display:'🔵', color:'#498CF0'},
-    {name:'🟡黄', display:'🟡', color:'#FFF200'},
-    {name:'🟢緑', display:'🟢', color:'#57C544'}
-  ];
+  const SELECT_COLORS = [\n    {name:'未選択', display:'', color:''},\n    {name:'🔴赤', display:'🔴', color:'#FE3C4F'},\n    {name:'🔵青', display:'🔵', color:'#498CF0'},\n    {name:'🟡黄', display:'🟡', color:'#FFF200'},\n    {name:'🟢緑', display:'🟢', color:'#57C544'},\n  ];
 
-  const AUTO_COLORS = [
-    '#FE3C4F', '#498CF0', '#FFF200', '#57C544',
-    '#FF7CD5', '#7BE0FF', '#FD8600', '#AD6BFF',
-    '#ACF243', '#B58464', '#FFB5EC', '#CCCCCC'
-  ];
+  const AUTO_COLORS = [\n    '#FE3C4F', '#498CF0', '#FFF200', '#57C544',\n    '#FF7CD5', '#7BE0FF', '#FD8600', '#AD6BFF',\n    '#ACF243', '#B58464', '#FFB5EC', '#CCCCCC'\n  ];
 
   const CPU_COLOR = '#4C4C4C';
   const POINTS_12 = [15,12,10,9,8,7,6,5,4,3,2,1];
   const POINTS_24 = [15,12,10,9,9,8,8,7,7,6,6,6,5,5,5,4,4,4,3,3,3,2,2,1];
 
-  const MAXDIFF = {
-    '12': { '2':80, '3':105, '4':120, '6':135 },
-    '24': { '2':160, '3':210, '4':240, '6':270, '8':285, '12':300 }
-  };
+  const MODES = {\n    '2v2': { teams: 12, size: 2 },\n    '3v3': { teams: 8,  size: 3 },\n    '4v4': { teams: 6,  size: 4 },\n    '6v6': { teams: 4,  size: 6 },\n    '12v12': { teams: 2, size: 12 },\n    'FFA': { teams: 24, size: 1 }\n  };
 
-  const MODES = {
-    '12': [
-      { value:'2', text:'2人×6形式 (2v2v2v2v2v2)' },
-      { value:'3', text:'3人×4形式 (3v3v3v3)' },
-      { value:'4', text:'4人×3形式 (4v4v4)' },
-      { value:'6', text:'6人×2形式 (6v6)' }
-    ],
-    '24': [
-      { value:'2', text:'2人×12形式 (2v12)' },
-      { value:'3', text:'3人×8形式 (3v8)' },
-      { value:'4', text:'4人×6形式 (4v6)' },
-      { value:'6', text:'6人×4形式 (6v4)' },
-      { value:'8', text:'8人×3形式 (8v3)' },
-      { value:'12', text:'12人×2形式 (12v12)' }
-    ]
-  };
+  const MAXDIFF = {\n    '12': {\n      '2v2': 10, '3v3': 15, '4v4': 16, '6v6': 12, '12v12': 0, 'FFA': 14\n    },\n    '24': {\n      '2v2': 20, '3v3': 27, '4v4': 32, '6v6': 36, '12v12': 24, 'FFA': 14\n    }\n  };
 
-  const KEY_MAP = {
-    '1':'1', '2':'2', '3':'3', '4':'4', '5':'5', '6':'6', '7':'7', '8':'8', '9':'9',
-    '0':'10', '00':'10', '-':'11', '^':'12'
-  };
+  let state = {\n    players: '24',\n    mode: '2v2',\n    races: 12,\n    autoColor: true,\n    showCert: true,\n    realtimeLog: false,\n    showCourseLog: false,\n    optViewTeam: '',\n    teams: [],\n    racesData: [],\n    courses: [],\n    lastUpdated: 0,\n    finishedAt: 0\n  };
 
-  let state = {
-    players: '24',
-    mode: '6',
-    races: '12',
-    selfTeam: 'A',
-    cpuTeam: 'none',
-    useColor: true,
-    sortTag: true,
-    showCert: false,
-    showCourseLog: false,
-    optViewTeam: 'all',
-    teams: [],
-    ranks: {},
-    courses: {},
-    locks: {},
-    history: [],
-    lastUpdated: 0
-  };
+  let undoStack = [];\n  let redoStack = [];\n  let suppressNewRaceCheck = false;\n  let saveTimer = null;
 
-  let suppressNewRaceCheck = false;
-  let saveTimeout = null;
+  const appEl = document.getElementById('app');\n  const selMode = document.getElementById('selMode');\n  const spMaxDiff = document.getElementById('spMaxDiff');\n  const chkAutoColor = document.getElementById('chkAutoColor');\n  const chkShowCert = document.getElementById('chkShowCert');\n  const chkRealtimeLog = document.getElementById('chkRealtimeLog');\n  const chkShowCourseLog = document.getElementById('chkShowCourseLog');\n  const btnUndo = document.getElementById('btnUndo');\n  const btnRedo = document.getElementById('btnRedo');\n  const btnReset = document.getElementById('btnReset');\n  const btnRecovery = document.getElementById('btnRecovery');\n  const tblRank = document.getElementById('tblRank');\n  const tblTag = document.getElementById('tblTag');\n  const outText = document.getElementById('outText');\n  const outIndiv = document.getElementById('outIndiv');\n  const outOpt = document.getElementById('outOpt');\n  const selView = document.getElementById('selView');\n  const btnCopyText = document.getElementById('btnCopyText');\n  const btnCopyIndiv = document.getElementById('btnCopyIndiv');\n  const btnCopyOpt = document.getElementById('btnCopyOpt');\n  const logAdj = document.getElementById('logAdj');\n  const logCourse = document.getElementById('logCourse');\n  const btnPin = document.getElementById('btnPin');\n  const btnPinClose = document.getElementById('btnPinClose');\n  const pinBar = document.getElementById('pinBar');\n  const pinBarContent = document.getElementById('pinBarContent');\n  const btnSpec = document.getElementById('btnSpec');\n  const btnSpecClose = document.getElementById('btnSpecClose');\n  const modalSpec = document.getElementById('modalSpec');
 
-  const selMode = document.getElementById('selMode');
-  const selSelfTeam = document.getElementById('selSelfTeam');
-  const selCpuTeam = document.getElementById('selCpuTeam');
-  const chkUseColor = document.getElementById('chkUseColor');
-  const chkSortTag = document.getElementById('chkSortTag');
-  const chkShowCert = document.getElementById('chkShowCert');
-  const chkShowCourseLog = document.getElementById('chkShowCourseLog');
-  const selView = document.getElementById('selView');
-  const btnRecovery = document.getElementById('btnRecovery');
-  const btnReset = document.getElementById('btnReset');
-  const btnCopyPlain = document.getElementById('btnCopyPlain');
-  const btnCopyOpt = document.getElementById('btnCopyOpt');
-  const btnPin = document.getElementById('btnPin');
-  const btnPinClose = document.getElementById('btnPinClose');
-  const pinBar = document.getElementById('pinBar');
-  const pinBarContent = document.getElementById('pinBarContent');
-  const btnSpec = document.getElementById('btnSpec');
-  const btnSpecClose = document.getElementById('btnSpecClose');
-  const modalSpec = document.getElementById('modalSpec');
-  const errMain = document.getElementById('errMain');
-  const copyStatusMsg = document.getElementById('copyStatusMsg');
-  const outPlain = document.getElementById('outPlain');
-  const outOpt = document.getElementById('outOpt');
-  const logAdj = document.getElementById('logAdj');
-  const logCourse = document.getElementById('logCourse');
-  const spMaxDiff = document.getElementById('spMaxDiff');
-  const tagMainRow = document.getElementById('tagMainRow');
-  const tagTables = document.getElementById('tagTables');
-  const cpuInlineWrap = document.getElementById('cpuInlineWrap');
-  const rankWrap = document.getElementById('rankWrap');
-  const pinPreview = document.getElementById('pinPreview');
+  function nowMs(){\n    return Date.now();\n  }
 
-  function nowMs(){ return Date.now(); }
+  function structuredCloneSafe(obj){\n    try {\n      if (typeof structuredClone === 'function') {\n        return structuredClone(obj);\n      }\n      return JSON.parse(JSON.stringify(obj));\n    } catch(e) {\n      return obj;\n    }\n  }
 
-  function cloneState(s){
-    return JSON.parse(JSON.stringify(s));
-  }
+  function pushState(){\n    undoStack.push(JSON.stringify({ teams: state.teams, racesData: state.racesData, courses: state.courses }));\n    if(undoStack.length > 50) undoStack.shift();\n    redoStack = [];\n    updateUndoRedoButtons();\n  }
 
-  function pushHistory(){
-    state.lastUpdated = nowMs();
-    state.history.push({
-      ranks: JSON.parse(JSON.stringify(state.ranks)),
-      courses: JSON.parse(JSON.stringify(state.courses)),
-      locks: JSON.parse(JSON.stringify(state.locks))
-    });
-    if(state.history.length > 50) state.history.shift();
-    updateRecoveryButton();
-  }
+  function updateUndoRedoButtons(){\n    if (btnUndo) btnUndo.disabled = (undoStack.length === 0);\n    if (btnRedo) btnRedo.disabled = (redoStack.length === 0);\n  }
 
-  function updateRecoveryButton(){
-    btnRecovery.disabled = (state.history.length === 0);
-  }
+  function ensureTeams(){\n    const conf = MODES[state.mode] || MODES['2v2'];\n    const totalPlayers = parseInt(state.players, 10) || 24;\n    const teamCount = conf.teams;\n    const size = conf.size;\n\n    if(!Array.isArray(state.teams)) state.teams = [];\n\n    while(state.teams.length < teamCount){\n      state.teams.push({\n        id: state.teams.length,\n        name: 'Team ' + String.fromCharCode(65 + state.teams.length),\n        colorIdx: 0,\n        players: []\n      });\n    }\n    if(state.teams.length > teamCount){\n      state.teams = state.teams.slice(0, teamCount);\n    }\n\n    state.teams.forEach((t, i)=>{\n      if(!t.name || t.name.startsWith('Team ')){\n        t.name = 'Team ' + String.fromCharCode(65 + i);\n      }\n      if(!Array.isArray(t.players)) t.players = [];\n      while(t.players.length < size){\n        t.players.push({ name: '' });\n      }\n      if(t.players.length > size){\n        t.players = t.players.slice(0, size);\n      }\n    });\n  }
 
-  function scheduleSave(){
-    if(saveTimeout) clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(saveToLocalStorage, 1000);
-  }
+  function ensureSelections(){\n    const totalRaces = parseInt(state.races, 10) || 12;\n    const totalPlayers = parseInt(state.players, 10) || 24;\n    if(!Array.isArray(state.racesData)) state.racesData = [];\n\n    while(state.racesData.length < totalRaces){\n      state.racesData.push(new Array(totalPlayers).fill(null));\n    }\n    if(state.racesData.length > totalRaces){\n      state.racesData = state.racesData.slice(0, totalRaces);\n    }\n\n    state.racesData.forEach((r, ri)=>{\n      if(!Array.isArray(r) || r.length !== totalPlayers){\n        const nextR = new Array(totalPlayers).fill(null);\n        if(Array.isArray(r)){\n          for(let i=0; i<Math.min(r.length, totalPlayers); i++) nextR[i] = r[i];\n        }\n        state.racesData[ri] = nextR;\n      }\n    });\n\n    if(!Array.isArray(state.courses)) state.courses = [];\n    while(state.courses.length < totalRaces){\n      state.courses.push('');\n    }\n    if(state.courses.length > totalRaces){\n      state.courses = state.courses.slice(0, totalRaces);\n    }\n  }
 
-  function saveToLocalStorage(){
-    try {
-      const dataToSave = cloneState(state);
-      dataToSave.history = [];
-      localStorage.setItem(LS_KEY, JSON.stringify(dataToSave));
-    }catch(e){}
-  }
+  function pruneInputs(){\n    const totalPlayers = parseInt(state.players, 10) || 24;\n    state.racesData.forEach(r=>{\n      for(let i=0; i<totalPlayers; i++){\n        if(r[i] !== null){\n          if(r[i] < 1 || r[i] > totalPlayers) r[i] = null;\n        }\n      }\n    });\n  }
 
-  function loadSaved(){
-    try {
-      const raw = localStorage.getItem(LS_KEY);
-      if(!raw) return;
-      const parsed = JSON.parse(raw);
-      if(!parsed || typeof parsed !== 'object') return;
-      if(parsed.lastUpdated && nowMs() - parsed.lastUpdated > FINISHED_TTL_MS){
-        return;
-      }
-      if(parsed.players) state.players = parsed.players;
-      if(parsed.mode) state.mode = parsed.mode;
-      if(parsed.races) state.races = parsed.races;
-      if(parsed.selfTeam) state.selfTeam = parsed.selfTeam;
-      if(parsed.cpuTeam) state.cpuTeam = parsed.cpuTeam;
-      if(parsed.hasOwnProperty('useColor')) state.useColor = parsed.useColor;
-      if(parsed.hasOwnProperty('sortTag')) state.sortTag = parsed.sortTag;
-      if(parsed.hasOwnProperty('showCert')) state.showCert = parsed.showCert;
-      if(parsed.hasOwnProperty('showCourseLog')) state.showCourseLog = parsed.showCourseLog;
-      if(parsed.optViewTeam) state.optViewTeam = parsed.optViewTeam;
-      if(Array.isArray(parsed.teams)) state.teams = parsed.teams;
-      if(parsed.ranks) state.ranks = parsed.ranks;
-      if(parsed.courses) state.courses = parsed.courses;
-      if(parsed.locks) state.locks = parsed.locks;
-    }catch(e){}
-  }
+  function buildModeOptions(){\n    if(!selMode) return;\n    const curr = selMode.value || state.mode;\n    selMode.innerHTML = '';\n    Object.keys(MODES).forEach(m=>{\n      const opt = document.createElement('option');\n      opt.value = m;\n      opt.textContent = m;\n      selMode.appendChild(opt);\n    });\n    selMode.value = Object.keys(MODES).includes(curr) ? curr : '2v2';\n    state.mode = selMode.value;\n  }
 
-  function ensureTeams(){
-    const pCount = parseInt(state.players, 10);
-    const tSize = parseInt(state.mode, 10);
-    const numTeams = pCount / tSize;
-    const currentNum = state.teams.length;
-    if(currentNum < numTeams){
-      for(let i=currentNum; i<numTeams; i++){
-        const letter = String.fromCharCode(65 + i);
-        state.teams.push({
-          letter: letter,
-          tag: '',
-          colorIdx: 0
-        });
-      }
-    }else if(currentNum > numTeams){
-      state.teams = state.teams.slice(0, numTeams);
-    }
-  }
+  function buildOptViewOptions(){\n    if(!selView) return;\n    const curr = selView.value || state.optViewTeam;\n    selView.innerHTML = '';\n    const optNone = document.createElement('option');\n    optNone.value = '';\n    optNone.textContent = '--選択してください--';\n    selView.appendChild(optNone);\n\n    state.teams.forEach(t=>{\n      const opt = document.createElement('option');\n      opt.value = t.name;\n      opt.textContent = t.name;\n      selView.appendChild(opt);\n    });\n    selView.value = state.teams.some(t=>t.name === curr) ? curr : '';\n    state.optViewTeam = selView.value;\n  }
 
-  function ensureSelections(){
-    const pCount = parseInt(state.players, 10);
-    const totalRaces = parseInt(state.races, 10);
-    for(let r=1; r<=totalRaces; r++){
-      if(!state.ranks[r]) state.ranks[r] = {};
-      if(!state.courses[r]) state.courses[r] = '';
-      if(!state.locks[r]) state.locks[r] = false;
-      for(let p=1; p<=pCount; p++){
-        if(!state.ranks[r][p]) state.ranks[r][p] = '';
-      }
-    }
-  }
+  function getPlayerColor(teamIdx, playerIdx){\n    if(state.autoColor){\n      const conf = MODES[state.mode] || MODES['2v2'];\n      const globalIdx = teamIdx * conf.size + playerIdx;\n      return AUTO_COLORS[globalIdx % AUTO_COLORS.length];\n    }\n    const t = state.teams[teamIdx];\n    if(t && t.colorIdx > 0){\n      return SELECT_COLORS[t.colorIdx]?.color || '';\n    }\n    return '';\n  }
 
-  function pruneInputs(){
-    const pCount = parseInt(state.players, 10);
-    const totalRaces = parseInt(state.races, 10);
-    for(const rKey in state.ranks){
-      if(parseInt(rKey,10) > totalRaces){
-        delete state.ranks[rKey];
-        delete state.courses[rKey];
-        delete state.locks[rKey];
-        continue;
-      }
-      for(const pKey in state.ranks[rKey]){
-        if(parseInt(pKey,10) > pCount){
-          delete state.ranks[rKey][pKey];
-        }
-      }
-    }
-  }
-
-  function updateModeOptions(){
-    selMode.innerHTML = '';
-    const opts = MODES[state.players] || [];
-    opts.forEach(o => {
-      const el = document.createElement('option');
-      el.value = o.value;
-      el.textContent = o.text;
-      selMode.appendChild(el);
-    });
-    const valid = opts.some(o => o.value === state.mode);
-    if(!valid && opts.length > 0) state.mode = opts[0].value;
-    selMode.value = state.mode;
-  }
-
-  function updateSelfCpuOptions(){
-    selSelfTeam.innerHTML = '';
-    state.teams.forEach(t => {
-      const el = document.createElement('option');
-      el.value = t.letter;
-      el.textContent = t.letter + '組';
-      selSelfTeam.appendChild(el);
-    });
-    selSelfTeam.value = state.selfTeam;
-
-    selCpuTeam.innerHTML = '';
-    const elNone = document.createElement('option');
-    elNone.value = 'none';
-    elNone.textContent = 'なし';
-    selCpuTeam.appendChild(elNone);
-    state.teams.forEach(t => {
-      const el = document.createElement('option');
-      el.value = t.letter;
-      el.textContent = t.letter + '組';
-      selCpuTeam.appendChild(el);
-    });
-    selCpuTeam.value = state.cpuTeam;
-  }
-
-  function initControls(){
-    const radPlayers = document.querySelectorAll('input[name="players"]');
-    radPlayers.forEach(r => {
-      if(r.value === state.players) r.checked = true;
-      r.addEventListener('change', async ()=>{
-        if(r.checked){
-          state.players = r.value;
-          updateModeOptions();
-          ensureTeams();
-          ensureSelections();
-          pruneInputs();
-          updateSelfCpuOptions();
-          buildTagTables();
-          buildOptViewOptions();
-          buildRankTable();
-          renderPinPreview();
-          if(spMaxDiff) spMaxDiff.textContent = String(MAXDIFF[state.players][state.mode] ?? '--');
-          await runCalcByCurrentValidState(true);
-          scheduleSave();
-        }
-      });
-    });
-
-    updateModeOptions();
-
-    const radRaces = document.querySelectorAll('input[name="races"]');
-    radRaces.forEach(r => {
-      if(r.value === state.races) r.checked = true;
-      r.addEventListener('change', async ()=>{
-        if(r.checked){
-          state.races = r.value;
-          ensureSelections();
-          pruneInputs();
-          buildRankTable();
-          renderPinPreview();
-          await runCalcByCurrentValidState(true);
-          scheduleSave();
-        }
-      });
-    });
-
-    selMode.addEventListener('change', async ()=>{
-      state.mode = selMode.value;
-      ensureTeams();
-      ensureSelections();
-      pruneInputs();
-      updateSelfCpuOptions();
-      buildTagTables();
-      buildOptViewOptions();
-      buildRankTable();
-      renderPinPreview();
-      if(spMaxDiff) spMaxDiff.textContent = String(MAXDIFF[state.players][state.mode] ?? '--');
-      await runCalcByCurrentValidState(true);
-      scheduleSave();
-    });
-
-    updateSelfCpuOptions();
-
-    selSelfTeam.addEventListener('change', async ()=>{
-      state.selfTeam = selSelfTeam.value;
-      buildTagTables();
-      await runCalcByCurrentValidState(false);
-      scheduleSave();
-    });
-
-    selCpuTeam.addEventListener('change', async ()=>{
-      state.cpuTeam = selCpuTeam.value;
-      buildTagTables();
-      await runCalcByCurrentValidState(false);
-      scheduleSave();
-    });
-
-    chkUseColor.checked = state.useColor;
-    if(state.useColor) tagMainRow.classList.add('colorOn');
-    else tagMainRow.classList.remove('colorOn');
-
-    chkUseColor.addEventListener('change', async ()=>{
-      state.useColor = chkUseColor.checked;
-      if(state.useColor) tagMainRow.classList.add('colorOn');
-      else tagMainRow.classList.remove('colorOn');
-      await runCalcByCurrentValidState(false);
-      scheduleSave();
-    });
-
-    chkSortTag.checked = state.sortTag;
-    chkSortTag.addEventListener('change', async ()=>{
-      state.sortTag = chkSortTag.checked;
-      await runCalcByCurrentValidState(false);
-      scheduleSave();
-    });
-
-    chkShowCert.checked = state.showCert;
-    chkShowCert.addEventListener('change', async ()=>{
-      state.showCert = chkShowCert.checked;
-      await runCalcByCurrentValidState(false);
-      scheduleSave();
-    });
-
-    chkShowCourseLog.checked = state.showCourseLog;
-    chkShowCourseLog.addEventListener('change', ()=>{
-      state.showCourseLog = chkShowCourseLog.checked;
-      renderCourseLog(state.courses);
-      scheduleSave();
-    });
-
-    selView.addEventListener('change', async ()=>{
-      state.optViewTeam = selView.value;
-      await runCalcByCurrentValidState(false);
-      scheduleSave();
-    });
-
-    btnPin.addEventListener('click', showPin);
-    btnPinClose.addEventListener('click', hidePin);
-    btnSpec.addEventListener('click', openModal);
-    btnSpecClose.addEventListener('click', closeModal);
-    modalSpec.querySelector('.modalBack')?.addEventListener('click', closeModal);
-    setTabOrder();
-  }
-
-  function init(){
-    suppressNewRaceCheck = true;
-    loadSaved();
-    ensureTeams();
-    ensureSelections();
-    pruneInputs();
-    initControls();
-    buildTagTables();
-    buildOptViewOptions();
-    buildRankTable();
-    renderPinPreview();
-    if(spMaxDiff) spMaxDiff.textContent = String(MAXDIFF[state.players][state.mode] ?? '--');
-    renderAdjLog();
-    renderCourseLog(state.courses);
-    updateRecoveryButton();
-    setTabOrder();
-    runCalcByCurrentValidState(false).then(()=>{
-      suppressNewRaceCheck = false;
-      state.lastUpdated = state.lastUpdated || nowMs();
-    });
-  }
-
-  window.addEventListener('DOMContentLoaded', init);
-})();
+  function getPtsTable(){\n    return state.players === '12' ? POINTS_12 : POINTS_24;\n  }\n\n  function calcScores(){\n    const ptsTable = getPtsTable();\n    const totalPlayers = parseInt(state.players, 10) || 24;\n    const conf = MODES[state.mode] || MODES['2v2'];\n\n    let flatPlayers = [];\n    state.teams.forEach((t, ti)=>{\n      t.players.forEach((p, pi)=>{\n        flatPlayers.push({\n          teamId: t.id,\n          teamName: t.name,\n          playerIdx: pi,\n          pName: p.name || ('P' + (ti * conf.size + pi + 1)),\n          color: getPlayerColor(ti, pi),\n          isCpu: false,\n          scores: new Array(state.racesData.length).fill(0),\n          ranks: new Array(state.racesData.length).fill(null),\n          total: 0\n        });\n      });\n    });\n\n    while(flatPlayers.length < totalPlayers){\n      flatPlayers.push({\n        teamId: -1,\n        teamName: 'CPU',\n        playerIdx: 0,\n        pName: 'CPU',\n        color: CPU_COLOR,\n        isCpu: true,\n        scores: new Array(state.racesData.length).fill(0),\n        ranks: new Array(state.racesData.length).fill(null),\n        total: 0\n      });\n    }\n\n    let raceStatuses = [];\n    state.racesData.forEach((r, ri)=>{\n      let used = new Set();\n      let dups = new Set();\n      let counts = {};\n      let filledCount = 0;\n\n      r.forEach(v=>{\n        if(v !== null){\n          filledCount++;\n          counts[v] = (counts[v] || 0) + 1;\n          if(counts[v] > 1) dups.add(v);\n          used.add(v);\n        }\n      });\n\n      let isError = (dups.size > 0);\n      let isComplete = (filledCount === totalPlayers && !isError);\n      let isPartial = (filledCount > 0 && filledCount < totalPlayers && !isError);\n\n      let finalRanks = new Array(totalPlayers).fill(null);\n      if(isComplete){\n        for(let i=0; i<totalPlayers; i++) finalRanks[i] = r[i];\n      } else if(isPartial){\n        let remain = [];\n        for(let i=1; i<=totalPlayers; i++){\n          if(!used.has(i)) remain.push(i);\n        }\n        remain.sort((a,b)=>a-b);\n        let rIdx = 0;\n        for(let i=0; i<totalPlayers; i++){\n          if(r[i] !== null) {\n            finalRanks[i] = r[i];\n          } else {\n            finalRanks[i] = remain[rIdx++] || totalPlayers;\n          }\n        }\n      } else if(filledCount === 0){\n        // 全空\n      }\n\n      for(let i=0; i<totalPlayers; i++){\n        if(isComplete || isPartial){\n          const rk = finalRanks[i];\n          if(rk >= 1 && rk <= ptsTable.length){\n            flatPlayers[i].scores[ri] = ptsTable[rk - 1];\n          }\n          flatPlayers[i].ranks[ri] = r[i];\n        } else {\n          flatPlayers[i].ranks[ri] = r[i];\n        }\n      }\n\n      raceStatuses.push({ isError, isComplete, isPartial, dups });\n    });\n\n    flatPlayers.forEach(p=>{\n      p.total = p.scores.reduce((a,b)=>a+b, 0);\n    });\n\n    let teamMap = {};\n    state.teams.forEach(t=>{\n      teamMap[t.id] = { id: t.id, name: t.name, total: 0, pScores: [] };\n    });\n\n    flatPlayers.forEach(p=>{\n      if(teamMap[p.teamId]){\n        teamMap[p.teamId].total += p.total;\n        teamMap[p.teamId].pScores.push(p);\n      }\n    });\n\n    let teamsResult = Object.values(teamMap);\n    teamsResult.sort((a,b)=>b.total - a.total);\n\n    return { flatPlayers, teamsResult, raceStatuses };\n  }\n\n  function calcAdjLogs(flatPlayers, teamsResult, raceStatuses){\n    const ptsTable = getPtsTable();\n    const totalPlayers = parseInt(state.players, 10) || 24;\n    const totalRaces = parseInt(state.races, 10) || 12;\n    const conf = MODES[state.mode] || MODES['2v2'];\n    const maxDiffLimit = MAXDIFF[state.players][state.mode] ?? 0;\n\n    let compCount = raceStatuses.filter(s=>s.isComplete || s.isPartial).length;\n    if(compCount === 0 || maxDiffLimit === 0) return { logs: [], teamAdj: {} };\n\n    let teamAdj = {};\n    state.teams.forEach(t=> { teamAdj[t.id] = 0; });\n\n    let logs = [];\n    let currentRacesData = structuredCloneSafe(state.racesData);\n\n    for(let ri=0; ri<totalRaces; ri++){\n      let st = raceStatuses[ri];\n      if(!st.isComplete && !st.isPartial) continue;\n\n      let roundPlayers = [];\n      state.teams.forEach((t, ti)=>{\n        t.players.forEach((p, pi)=>{\n          let idx = ti * conf.size + pi;\n          let rk = currentRacesData[ri][idx];\n          let finalRk = rk;\n          if(st.isPartial && rk === null){\n            let used = new Set(currentRacesData[ri].filter(v=>v!==null));\n            let remain = [];\n            for(let k=1; k<=totalPlayers; k++) if(!used.has(k)) remain.push(k);\n            remain.sort((a,b)=>a-b);\n            let rIdx = 0;\n            for(let k=0; k<totalPlayers; k++){\n              if(k === idx){\n                finalRk = remain[rIdx] || totalPlayers;\n                break;\n              }\n              if(currentRacesData[ri][k] === null) rIdx++;\n            }\n          }\n          roundPlayers.push({\n            teamId: t.id,\n            teamName: t.name,\n            rank: finalRk,\n            score: (finalRk >= 1 && finalRk <= ptsTable.length) ? ptsTable[finalRk - 1] : 0\n          });\n        });\n      });\n\n      let roundTeams = {};\n      state.teams.forEach(t=> { roundTeams[t.id] = 0; });\n      roundPlayers.forEach(p=>{\n        if(roundTeams[p.teamId] !== undefined) roundTeams[p.teamId] += p.score;\n      });\n\n      if(state.realtimeLog){\n        let tIds = state.teams.map(t=>t.id);\n        for(let i=0; i<tIds.length; i++){\n          for(let j=i+1; j<tIds.length; j++){\n            let tA = tIds[i];\n            let tB = tIds[j];\n            let diff = (roundTeams[tA] + teamAdj[tA]) - (roundTeams[tB] + teamAdj[tB]);\n            if(Math.abs(diff) > maxDiffLimit){\n              let tAName = state.teams.find(t=>t.id===tA)?.name || '';\n              let tBName = state.teams.find(t=>t.id===tB)?.name || '';\n              if(diff > maxDiffLimit){\n                let adj = diff - maxDiffLimit;\n                teamAdj[tB] += adj;\n                logs.push(`R${ri+1}: ${tAName} vs ${tBName} 補正点+${adj} (${tBName}へ)`);\n              } else {\n                let adj = Math.abs(diff) - maxDiffLimit;\n                teamAdj[tA] += adj;\n                logs.push(`R${ri+1}: ${tBName} vs ${tAName} 補正点+${adj} (${tAName}へ)`);\n              }\n            }\n          }\n        }\n      } else {\n        if(ri === compCount - 1){\n          let cumTeams = {};\n          state.teams.forEach(t=>{\n            cumTeams[t.id] = flatPlayers.filter(p=>p.teamId===t.id).reduce((sum, p)=>{\n              let sSum = 0;\n              for(let k=0; k<=ri; k++) sSum += p.scores[k] || 0;\n              return sum + sSum;\n            }, 0);\n          });\n          let tIds = state.teams.map(t=>t.id);\n          let loop = true;\n          while(loop){\n            loop = false;\n            for(let i=0; i<tIds.length; i++){\n              for(let j=i+1; j<tIds.length; j++){\n                let tA = tIds[i];\n                let tB = tIds[j];\n                let diff = (cumTeams[tA] + teamAdj[tA]) - (cumTeams[tB] + teamAdj[tB]);\n                if(Math.abs(diff) > maxDiffLimit){\n                  let tAName = state.teams.find(t=>t.id===tA)?.name || '';\n                  let tBName = state.teams.find(t=>t.id===tB)?.name || '';\n                  if(diff > maxDiffLimit){\n                    let adj = diff - maxDiffLimit;\n                    teamAdj[tB] += adj;\n                    logs.push(`累計補正: ${tAName} vs ${tBName} 補正点+${adj} (${tBName}へ)`);\n                    loop = true;\n                  } else {\n                    let adj = Math.abs(diff) - maxDiffLimit;\n                    teamAdj[tA] += adj;\n                    logs.push(`累計補正: ${tBName} vs ${tAName} 補正点+${adj} (${tAName}へ)`);\n                    loop = true;\n                  }\n                }\n              }\n            }\n          }\n        }\n      }\n    }\n    return { logs, teamAdj };\n  }\n\n  function calcCertLines(flatPlayers, teamsResult, raceStatuses, teamAdj){\n    const ptsTable = getPtsTable();\n    const totalPlayers = parseInt(state.players, 10) || 24;\n    const totalRaces = parseInt(state.races, 10) || 12;\n    const conf = MODES[state.mode] || MODES['2v2'];\n\n    let compCount = raceStatuses.filter(s=>s.isComplete || s.isPartial).length;\n    let remainRaces = totalRaces - compCount;\n    let certMap = {};\n\n    state.teams.forEach(t=>{\n      let base = flatPlayers.filter(p=>p.teamId===t.id).reduce((a,b)=>a+b.total, 0) + (teamAdj[t.id] || 0);\n      certMap[t.id] = { min: base, max: base };\n    });\n\n    if(remainRaces > 0 && state.teams.length > 0){\n      let maxRoundTeamScore = 0;\n      let minRoundTeamScore = 0;\n\n      let sortedPts = [...ptsTable].sort((a,b)=>b-a);\n      for(let i=0; i<conf.size; i++) maxRoundTeamScore += sortedPts[i] || 0;\n      for(let i=0; i<conf.size; i++) minRoundTeamScore += sortedPts[sortedPts.length - 1 - i] || 0;\n\n      state.teams.forEach(t=>{\n        certMap[t.id].max += maxRoundTeamScore * remainRaces;\n        certMap[t.id].min += minRoundTeamScore * remainRaces;\n      });\n    }\n\n    let certResults = {};\n    state.teams.forEach(tA=>{\n      let isWinCert = true;\n      let isLoseCert = true;\n      state.teams.forEach(tB=>{\n        if(tA.id === tB.id) return;\n        if(certMap[tA.id].min <= certMap[tB.id].max) isWinCert = false;\n        if(certMap[tA.id].max >= certMap[tB.id].min) isLoseCert = false;\n      });\n      if(isWinCert) certResults[tA.id] = 'win';\n      else if(isLoseCert) certResults[tA.id] = 'lose';\n      else certResults[tA.id] = '';\n    });\n\n    return certResults;\n  }\n\n  function buildRankTable(){\n    if(!tblRank) return;\n    tblRank.innerHTML = '';\n\n    const totalRaces = parseInt(state.races, 10) || 12;\n    const { flatPlayers, teamsResult, raceStatuses } = calcScores();\n    const { logs, teamAdj } = calcAdjLogs(flatPlayers, teamsResult, raceStatuses);\n    const certResults = calcCertLines(flatPlayers, teamsResult, raceStatuses, teamAdj);\n\n    let thead = document.createElement('thead');\n    let trHead = document.createElement('tr');\n\n    let thRank = document.createElement('th');\n    thRank.style.width = 'var(--rankw)';\n    thRank.textContent = '順位';\n    trHead.appendChild(thRank);\n\n    let thTeam = document.createElement('th');\n    thTeam.className = 'rowHead';\n    thTeam.style.width = '110px';\n    thTeam.textContent = 'チーム';\n    trHead.appendChild(thTeam);\n\n    let thTotal = document.createElement('th');\n    thTotal.style.width = 'var(--scorew)';\n    thTotal.textContent = '計';\n    trHead.appendChild(thTotal);\n\n    if(state.showCert){\n      let thCert = document.createElement('th');\n      thCert.style.width = '50px';\n      thCert.textContent = '確実';\n      trHead.appendChild(thCert);\n    }\n\n    let thPlayer = document.createElement('th');\n    thPlayer.style.width = '90px';\n    thPlayer.textContent = 'プレイヤー';\n    trHead.appendChild(thPlayer);\n\n    let thPTotal = document.createElement('th');\n    thPTotal.style.width = 'var(--scorew)';\n    thPTotal.textContent = '点';\n    trHead.appendChild(thPTotal);\n\n    for(let i=0; i<totalRaces; i++){\n      let thR = document.createElement('th');\n      thR.style.width = 'var(--racew)';\n      let st = raceStatuses[i];\n      if(st && st.isError) thR.style.color = 'var(--err)';\n      thR.textContent = 'R' + (i+1);\n      trHead.appendChild(thR);\n    }\n    thead.appendChild(trHead);\n    tblRank.appendChild(thead);\n\n    let tbody = document.createElement('tbody');\n    const conf = MODES[state.mode] || MODES['2v2'];\n\n    teamsResult.forEach((tRes, tIdx)=>{\n      let tId = tRes.id;\n      let tName = tRes.name;\n      let tColor = getPlayerColor(state.teams.findIndex(t=>t.id===tId), 0);\n      let finalTeamTotal = tRes.total + (teamAdj[tId] || 0);\n\n      tRes.pScores.sort((a,b)=>b.total - a.total);\n\n      tRes.pScores.forEach((pRes, pIdx)=>{\n        let tr = document.createElement('tr');\n\n        if(pIdx === 0){\n          let tdRank = document.createElement('td');\n          tdRank.rowSpan = conf.size;\n          tdRank.className = 'rankCell';\n          let rankLeadClass = (tIdx===0)?'topRank':(tIdx===1)?'secRank':(tIdx===2)?'thirdRank':'';\n          let spanRank = document.createElement('span');\n          spanRank.className = 'rankLead ' + rankLeadClass;\n          spanRank.textContent = String(tIdx + 1);\n          tdRank.appendChild(spanRank);\n          tr.appendChild(tdRank);\n\n          let tdTeam = document.createElement('td');\n          tdTeam.rowSpan = conf.size;\n          tdTeam.className = 'rowHead';\n          if(tColor) tdTeam.style.borderLeft = '4px solid ' + tColor;\n          let spanTeam = document.createElement('span');\n          spanTeam.textContent = tName;\n          tdTeam.appendChild(spanTeam);\n          tr.appendChild(tdTeam);\n\n          let tdTotal = document.createElement('td');\n          tdTotal.rowSpan = conf.size;\n          tdTotal.className = 'scoreCell';\n          tdTotal.textContent = String(finalTeamTotal);\n          tr.appendChild(tdTotal);\n\n          if(state.showCert){\n            let tdCert = document.createElement('td');\n            tdCert.rowSpan = conf.size;\n            tdCert.className = 'certCell';\n            let cRes = certResults[tId];\n            if(cRes === 'win'){\n              tdCert.className += ' ok';\n              tdCert.textContent = '勝ち確';\n            } else if(cRes === 'lose'){\n              tdCert.className += ' err';\n              tdCert.textContent = '負け確';\n            } else {\n              tdCert.textContent = '--';\n            }\n            tr.appendChild(tdCert);\n          }\n        }\n\n        let tdPName = document.createElement('td');\n        tdPName.style.textAlign = 'left';\n        tdPName.style.paddingLeft = '4px';\n        tdPName.textContent = pRes.pName;\n        tr.appendChild(tdPName);\n\n        let tdPTotal = document.createElement('td');\n        tdPTotal.textContent = String(pRes.total);\n        tr.appendChild(tdPTotal);\n\n        let globalPlayerIdx = state.teams.findIndex(t=>t.id===pRes.teamId) * conf.size + pRes.playerIdx;\n\n        for(let ri=0; ri<totalRaces; ri++){\n          let tdR = document.createElement('td');\n          tdR.className = 'raceCell';\n          let rVal = pRes.ranks[ri];\n          let st = raceStatuses[ri];\n\n          if(rVal !== null){\n            tdR.className += ' hasVal';\n            if(st && st.dups.has(rVal)){\n              tdR.className += ' isDup';\n            }\n            tdR.textContent = String(rVal);\n          } else if(st && (st.isComplete || st.isPartial)){\n            tdR.className += ' isComp';\n            let ptsTable = getPtsTable();\n            let mockRanks = new Array(parseInt(state.players,10)).fill(null);\n            for(let k=0; k<mockRanks.length; k++) mockRanks[k] = state.racesData[ri][k];\n            let used = new Set(mockRanks.filter(v=>v!==null));\n            let remain = [];\n            for(let k=1; k<=mockRanks.length; k++) if(!used.has(k)) remain.push(k);\n            remain.sort((a,b)=>a-b);\n            let rIdx = 0;\n            let finalRk = null;\n            for(let k=0; k<mockRanks.length; k++){\n              if(k === globalPlayerIdx){\n                finalRk = remain[rIdx] || mockRanks.length;\n                break;\n              }\n              if(mockRanks[k] === null) rIdx++;\n            }\n            tdR.textContent = finalRk ? `(${finalRk})` : '-';\n          } else {\n            tdR.textContent = '-';\n          }\n\n          tdR.addEventListener('click', (e)=>{\n            e.preventDefault();\n            handleRaceCellClick(ri, globalPlayerIdx);\n          });\n          tr.appendChild(tdR);\n        }\n\n        tbody.appendChild(tr);\n      });\n    });\n    tblRank.appendChild(tbody);\n  }\n\n  function handleRaceCellClick(raceIdx, playerIdx){\n    pushState();\n    const totalPlayers = parseInt(state.players, 10) || 24;\n    let curr = state.racesData[raceIdx][playerIdx];\n    if(curr === null){\n      state.racesData[raceIdx][playerIdx] = 1;\n    } else if(curr >= totalPlayers){\n      state.racesData[raceIdx][playerIdx] = null;\n    } else {\n      state.racesData[raceIdx][playerIdx] = curr + 1;\n    }\n    runCalcByCurrentValidState(true);\n    scheduleSave();\n  }\n\n  function buildTagTables(){\n    if(!tblTag) return;\n    tblTag.innerHTML = '';\n\n    let thead = document.createElement('thead');\n    let trHead = document.createElement('tr');\n    let thTeam = document.createElement('th');\n    thTeam.textContent = 'チーム名';\n    thTeam.style.width = '140px';\n    trHead.appendChild(thTeam);\n\n    let thColor = document.createElement('th');\n    thColor.textContent = '色';\n    thColor.style.width = '90px';\n    trHead.appendChild(thColor);\n\n    const conf = MODES[state.mode] || MODES['2v2'];\n    for(let i=0; i<conf.size; i++){\n      let thP = document.createElement('th');\n      thP.textContent = '枠' + (i+1);\n      trHead.appendChild(thP);\n    }\n    thead.appendChild(trHead);\n    tblTag.appendChild(thead);\n\n    let tbody = document.createElement('tbody');\n    state.teams.forEach((t, ti)=>{\n      let tr = document.createElement('tr');\n\n      let tdName = document.createElement('td');\n      tdName.className = 'tblTagCellName';\n      let ipName = document.createElement('input');\n      ipName.type = 'text';\n      ipName.value = t.name || '';\n      ipName.addEventListener('change', ()=>{\n        pushState();\n        t.name = ipName.value.trim() || ('Team ' + String.fromCharCode(65 + ti));\n        buildOptViewOptions();\n        runCalcByCurrentValidState(false);\n        scheduleSave();\n      });\n      tdName.appendChild(ipName);\n      tr.appendChild(tdName);\n\n      let tdColor = document.createElement('td');\n      tdColor.className = 'tblTagCellColor';\n      if(state.autoColor){\n        tdColor.style.background = '#eee';\n        tdColor.style.color = '#666';\n        tdColor.style.fontSize = '11px';\n        tdColor.textContent = '自動割り当て';\n      } else {\n        let selC = document.createElement('select');\n        SELECT_COLORS.forEach((c, ci)=>{\n          let opt = document.createElement('option');\n          opt.value = String(ci);\n          opt.textContent = c.name;\n          selC.appendChild(opt);\n        });\n        selC.value = String(t.colorIdx || 0);\n        let currColor = SELECT_COLORS[t.colorIdx || 0]?.color;\n        if(currColor) selC.style.backgroundColor = currColor;\n        selC.addEventListener('change', ()=>{\n          pushState();\n          t.colorIdx = parseInt(selC.value, 10) || 0;\n          let nextColor = SELECT_COLORS[t.colorIdx]?.color;\n          selC.style.backgroundColor = nextColor || '';\n          runCalcByCurrentValidState(false);\n          scheduleSave();\n        });\n        tdColor.appendChild(selC);\n      }\n      tr.appendChild(tdColor);\n\n      t.players.forEach((p, pi)=>{\n        let tdP = document.createElement('td');\n        let ipP = document.createElement('input');\n        ipP.type = 'text';\n        ipP.placeholder = 'P' + (ti * conf.size + pi + 1);\n        ipP.value = p.name || '';\n        ipP.addEventListener('change', ()=>{\n          pushState();\n          p.name = ipP.value.trim();\n          runCalcByCurrentValidState(false);\n          scheduleSave();\n        });\n        tdP.appendChild(ipP);\n        tr.appendChild(tdP);\n      });\n\n      tbody.appendChild(tr);\n    });\n    tblTag.appendChild(tbody);\n  }\n\n  function generateOutputs(){\n    const { flatPlayers, teamsResult, raceStatuses } = calcScores();\n    const { logs, teamAdj } = calcAdjLogs(flatPlayers, teamsResult, raceStatuses);\n\n    let compCount = raceStatuses.filter(s=>s.isComplete || s.isPartial).length;\n    let totalRaces = parseInt(state.races, 10) || 12;\n\n    let leadStr = (compCount >= totalRaces) ? '【集計完了】' : `【${compCount}R終了時】`;\n\n    let normalLines = [leadStr];\n    teamsResult.forEach((t, i)=>{\n      let finalT = t.total + (teamAdj[t.id] || 0);\n      normalLines.push(`${i+1}位 ${t.name} ${finalT}pts`);\n    });\n    if(outText) outText.textContent = normalLines.join('\n');\n\n    let indivLines = [`${leadStr} (個人寸評)`];\n    let sortedPlayers = [...flatPlayers].sort((a,b)=>b.total - a.total);\n    sortedPlayers.forEach((p, i)=>{\n      if(!p.isCpu){\n        indivLines.push(`${i+1}位 ${p.pName} (${p.teamName}) ${p.total}pts`);\n      }\n    });\n    if(outIndiv) outIndiv.textContent = indivLines.join('\n');\n\n    if(state.optViewTeam && outOpt){\n      let tRes = teamsResult.find(t=>t.name === state.optViewTeam);\n      if(tRes){\n        let finalT = tRes.total + (teamAdj[tRes.id] || 0);\n        let optLines = [`${leadStr} ${tRes.name} 視点`, `チーム合計: ${finalT}pts`];\n        tRes.pScores.forEach(p=>{\n          optLines.push(` - ${p.pName}: ${p.total}pts`);\n        });\n        outOpt.textContent = optLines.join('\n');\n      } else {\n        outOpt.textContent = '';\n      }\n    } else if(outOpt){\n      outOpt.textContent = '';\n    }\n  }\n\n  function renderAdjLog(){\n    if(!logAdj) return;\n    logAdj.textContent = '';\n    const { flatPlayers, teamsResult, raceStatuses } = calcScores();\n    const { logs } = calcAdjLogs(flatPlayers, teamsResult, raceStatuses);\n    if(logs.length > 0){\n      logAdj.textContent = logs.join('\n');\n    } else {\n      logAdj.textContent = '補正履歴なし';\n    }\n  }\n\n  function renderCourseLog(coursesArr){\n    if(!logCourse) return;\n    logCourse.textContent = '';\n    if(!state.showCourseLog){\n      logCourse.textContent = '非表示';\n      return;\n    }\n    let lines = [];\n    if(Array.isArray(coursesArr)){\n      coursesArr.forEach((c, i)=>{\n        if(c) lines.push(`R${i+1}: ${c}`);\n      });\n    }\n    logCourse.textContent = lines.length > 0 ? lines.join('\n') : 'コース未選択';\n  }\n\n  function renderPinPreview(){\n    if(!pinBarContent) return;\n    pinBarContent.innerHTML = '';\n    const { flatPlayers, teamsResult, raceStatuses } = calcScores();\n    const { logs, teamAdj } = calcAdjLogs(flatPlayers, teamsResult, raceStatuses);\n\n    teamsResult.forEach((t, i)=>{\n      let finalT = t.total + (teamAdj[t.id] || 0);\n      let div = document.createElement('div');\n      div.className = 'pinItem' + (i===0 ? ' top' : '');\n\n      let sRank = document.createElement('span');\n      sRank.textContent = `${i+1}位`;\n      div.appendChild(sRank);\n\n      let sName = document.createElement('span');\n      sName.className = 'pinName';\n      sName.textContent = t.name;\n      div.appendChild(sName);\n\n      let sScore = document.createElement('span');\n      sScore.className = 'pinScore';\n      sScore.textContent = `${finalT}pt`;\n      div.appendChild(sScore);\n\n      pinBarContent.appendChild(div);\n    });\n  }\n\n  async function copyText(el){\n    if(!el) return;\n    let txt = el.textContent || '';\n    if(!txt) return;\n    try {\n      if(navigator.clipboard && typeof navigator.clipboard.writeText === 'function'){\n        await navigator.clipboard.writeText(txt);\n        return;\n      }\n    } catch(e){}\n    try {\n      let ta = document.createElement('textarea');\n      ta.value = txt;\n      ta.style.position = 'fixed';\n      ta.style.opacity = '0';\n      document.body.appendChild(ta);\n      ta.select();\n      document.execCommand('copy');\n      document.body.removeChild(ta);\n    } catch(err){}\n  }\n\n  async function runCalcByCurrentValidState(skipUiRebuild){\n    if(!skipUiRebuild){\n      buildTagTables();\n    }\n    buildRankTable();\n    generateOutputs();\n    renderAdjLog();\n    renderPinPreview();\n    if(state.showCourseLog){\n      renderCourseLog(state.courses);\n    }\n  }\n\n  function scheduleSave(){\n    if(saveTimer) clearTimeout(saveTimer);\n    saveTimer = setTimeout(()=>{\n      state.lastUpdated = nowMs();\n      const { raceStatuses } = calcScores();\n      let isAllComp = raceStatuses.every(s=>s.isComplete);\n      if(isAllComp && state.racesData.length > 0){\n        if(!state.finishedAt) state.finishedAt = nowMs();\n      } else {\n        state.finishedAt = 0;\n      }\n      try {\n        localStorage.setItem(LS_KEY, JSON.stringify(state));\n      } catch(e){}\n    }, 1000);\n  }\n\n  function loadSaved(){\n    try {\n      let raw = localStorage.getItem(LS_KEY);\n      if(raw){\n        let parsed = JSON.parse(raw);\n        if(parsed && typeof parsed === 'object'){\n          if(parsed.players) state.players = String(parsed.players);\n          if(parsed.mode) state.mode = String(parsed.mode);\n          if(parsed.races) state.races = parseInt(parsed.races, 10) || 12;\n          if(parsed.autoColor !== undefined) state.autoColor = !!parsed.autoColor;\n          if(parsed.showCert !== undefined) state.showCert = !!parsed.showCert;\n          if(parsed.realtimeLog !== undefined) state.realtimeLog = !!parsed.realtimeLog;\n          if(parsed.showCourseLog !== undefined) state.showCourseLog = !!parsed.showCourseLog;\n          if(parsed.optViewTeam !== undefined) state.optViewTeam = String(parsed.optViewTeam);\n          if(Array.isArray(parsed.teams)) state.teams = parsed.teams;\n          if(Array.isArray(parsed.racesData)) state.racesData = parsed.racesData;\n          if(Array.isArray(parsed.courses)) state.courses = parsed.courses;\n          if(parsed.finishedAt) state.finishedAt = parseInt(parsed.finishedAt, 10) || 0;\n          if(parsed.lastUpdated) state.lastUpdated = parseInt(parsed.lastUpdated, 10) || 0;\n        }\n      }\n    } catch(e){}\n  }\n\n  function updateRecoveryButton(){\n    if(!btnRecovery) return;\n    try {\n      let raw = localStorage.getItem(LS_KEY);\n      if(raw) {\n        btnRecovery.classList.add('hidden');\n      } else {\n        btnRecovery.classList.add('hidden');\n      }\n    } catch(e){}\n  }\n\n  function showPin(){\n    if(pinBar) {\n      pinBar.classList.remove('hidden');\n      pinBar.setAttribute('aria-hidden', 'false');\n    }\n  }\n\n  function hidePin(){\n    if(pinBar) {\n      pinBar.classList.add('hidden');\n      pinBar.setAttribute('aria-hidden', 'true');\n    }\n  }\n\n  function openModal(){\n    if(modalSpec) {\n      modalSpec.classList.remove('hidden');\n      modalSpec.setAttribute('aria-hidden', 'false');\n    }\n  }\n\n  function closeModal(){\n    if(modalSpec) {\n      modalSpec.classList.add('hidden');\n      modalSpec.setAttribute('aria-hidden', 'true');\n    }\n  }\n\n  function setTabOrder(){\n    document.querySelectorAll('input, select, button').forEach(el=>{\n      if(!el.hasAttribute('tabindex')){\n        // tabindex制御維持\n      }\n    });\n  }\n\n  function initControls(){\n    document.querySelectorAll(`input[name="players"]`).forEach(r=>{\n      r.checked = (r.value === state.players);\n      r.addEventListener('change', async ()=>{\n        pushState();\n        state.players = r.value;\n        if(spMaxDiff) spMaxDiff.textContent = String(MAXDIFF[state.players][state.mode] ?? '--');\n        ensureTeams();\n        ensureSelections();\n        pruneInputs();\n        buildOptViewOptions();\n        await runCalcByCurrentValidState(false);\n        scheduleSave();\n      });\n    });\n\n    buildModeOptions();\n    if(selMode){\n      selMode.value = state.mode;\n      selMode.addEventListener('change', async ()=>{\n        pushState();\n        state.mode = selMode.value;\n        if(spMaxDiff) spMaxDiff.textContent = String(MAXDIFF[state.players][state.mode] ?? '--');\n        ensureTeams();\n        ensureSelections();\n        pruneInputs();\n        buildOptViewOptions();\n        await runCalcByCurrentValidState(false);\n        scheduleSave();\n      });\n    }\n\n    document.querySelectorAll(`input[name="races"]`).forEach(r=>{\n      r.checked = (parseInt(r.value, 10) === state.races);\n      r.addEventListener('change', async ()=>{\n        pushState();\n        state.races = parseInt(r.value, 10) || 12;\n        ensureSelections();\n        await runCalcByCurrentValidState(false);\n        scheduleSave();\n      });\n    });\n\n    if(chkAutoColor){\n      chkAutoColor.checked = state.autoColor;\n      chkAutoColor.addEventListener('change', async ()=>{\n        pushState();\n        state.autoColor = chkAutoColor.checked;\n        await runCalcByCurrentValidState(false);\n        scheduleSave();\n      });\n    }\n\n    if(chkShowCert){\n      chkShowCert.checked = state.showCert;\n    }\n    if(chkRealtimeLog){\n      chkRealtimeLog.checked = state.realtimeLog;\n      chkRealtimeLog.addEventListener('change', async ()=>{\n        pushState();\n        state.realtimeLog = chkRealtimeLog.checked;\n        await runCalcByCurrentValidState(false);\n        scheduleSave();\n      });\n    }\n\n    if(chkShowCourseLog){\n      chkShowCourseLog.checked = state.showCourseLog;\n    }\n\n    if(btnUndo){\n      btnUndo.addEventListener('click', async ()=>{\n        if(undoStack.length > 0){\n          let prev = undoStack.pop();\n          redoStack.push(JSON.stringify({ teams: state.teams, racesData: state.racesData, courses: state.courses }));\n          let parsed = JSON.parse(prev);\n          state.teams = parsed.teams;\n          state.racesData = parsed.racesData;\n          state.courses = parsed.courses;\n          updateUndoRedoButtons();\n          await runCalcByCurrentValidState(false);\n          scheduleSave();\n        }\n      });\n    }\n\n    if(btnRedo){\n      btnRedo.addEventListener('click', async ()=>{\n        if(redoStack.length > 0){\n          let next = redoStack.pop();\n          undoStack.push(JSON.stringify({ teams: state.teams, racesData: state.racesData, courses: state.courses }));\n          let parsed = JSON.parse(next);\n          state.teams = parsed.teams;\n          state.racesData = parsed.racesData;\n          state.courses = parsed.courses;\n          updateUndoRedoButtons();\n          await runCalcByCurrentValidState(false);\n          scheduleSave();\n        }\n      });\n    }\n\n    if(btnReset){\n      btnReset.addEventListener('click', async ()=>{\n        if(confirm('すべての入力データを初期化しますか？')){\n          pushState();\n          localStorage.removeItem(LS_KEY);\n          state.teams = [];\n          state.racesData = [];\n          state.courses = [];\n          state.finishedAt = 0;\n          ensureTeams();\n          ensureSelections();\n          buildOptViewOptions();\n          await runCalcByCurrentValidState(false);\n          scheduleSave();\n        }\n      });\n    }\n\n    if(btnCopyText) btnCopyText.addEventListener('click', ()=> copyText(outText));\n    if(btnCopyIndiv) btnCopyIndiv.addEventListener('click', ()=> copyText(outIndiv));\n    if(btnCopyOpt) btnCopyOpt.addEventListener('click', ()=> copyText(outOpt));\n\n    chkShowCert.addEventListener('change', async ()=>{\n      state.showCert = chkShowCert.checked;\n      await runCalcByCurrentValidState(false);\n      scheduleSave();\n    });\n    chkShowCourseLog.addEventListener('change', ()=>{\n      state.showCourseLog = chkShowCourseLog.checked;\n      renderCourseLog(state.courses);\n      scheduleSave();\n    });\n    selView.addEventListener('change', async ()=>{\n      state.optViewTeam = selView.value;\n      await runCalcByCurrentValidState(false);\n      scheduleSave();\n    });\n    btnPin.addEventListener('click', showPin);\n    btnPinClose.addEventListener('click', hidePin);\n    btnSpec.addEventListener('click', openModal);\n    btnSpecClose.addEventListener('click', closeModal);\n    modalSpec.querySelector('.modalBack')?.addEventListener('click', closeModal);\n    setTabOrder();\n  }\n\n  function init(){\n    suppressNewRaceCheck = true;\n    loadSaved();\n    ensureTeams();\n    ensureSelections();\n    pruneInputs();\n    initControls();\n    buildTagTables();\n    buildOptViewOptions();\n    buildRankTable();\n    renderPinPreview();\n    spMaxDiff.textContent = String(MAXDIFF[state.players][state.mode] ?? '--');\n    renderAdjLog();\n    renderCourseLog(state.courses);\n    updateRecoveryButton();\n    setTabOrder();\n    runCalcByCurrentValidState(false).then(()=>{\n      suppressNewRaceCheck = false;\n      state.lastUpdated = state.lastUpdated || nowMs();\n    });\n  }\n\n  document.addEventListener('DOMContentLoaded', init);\n})();\n```
