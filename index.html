@@ -34,81 +34,103 @@
             </div>
             <div class="ruleLine">
               <span class="label">レース数</span>
+              <label class="radio"><input type="radio" name="races" value="8">8</label>
               <label class="radio"><input type="radio" name="races" value="12" checked>12</label>
-              <label class="radio"><input type="radio" name="races" value="24">24</label>
-              <label class="radio"><input type="radio" name="races" value="36">36</label>
-              <label class="radio"><input type="radio" name="races" value="48">48</label>
-            </div>
-            <div class="ruleLine">
-              <span class="label">補正リミット</span>
-              <span id="spMaxDiff" class="val">--</span>
             </div>
           </div>
+
           <div class="ruleCol">
             <div class="ruleLine">
-              <label class="chk"><input id="chkAutoColor" type="checkbox" checked>チーム色を自動で割り振る</label>
+              <span class="label">通過組数</span>
+              <input id="inpQualify" class="inp small" inputmode="numeric" autocomplete="off" tabindex="-1" />
             </div>
             <div class="ruleLine">
-              <label class="chk"><input id="chkShowCert" type="checkbox" checked>確実ラインを表示する</label>
-            </div>
-            <div class="ruleLine">
-              <label class="chk"><input id="chkRealtimeLog" type="checkbox">リアルタイムに点数補正する</label>
-            </div>
-            <div class="ruleLine">
-              <button id="btnPin" class="btn btnPressAction" tabindex="-1">ピン留め表示</button>
+              <span class="label">CPU加算</span>
+              <div class="cpuBox">
+                <label class="radio"><input type="radio" name="cpuCalc" value="MKB" checked>MKBルール</label>
+                <label class="radio"><input type="radio" name="cpuCalc" value="SUMMIT">SUMMITルール</label>
+              </div>
             </div>
           </div>
         </div>
-        <div class="cardActions resetActionStack">
-          <button id="btnUndo" class="btn btnResetAction" tabindex="-1" disabled>戻す</button>
-          <button id="btnRedo" class="btn btnResetAction" tabindex="-1" disabled>進む</button>
-          <button id="btnReset" class="btn btnResetAction" tabindex="-1">初期化</button>
-          <button id="btnRecovery" class="btn btnResetAction hidden" tabindex="-1">データ復旧</button>
+      </section>
+
+      <section class="card">
+        <div class="cardHead">
+          <div class="cardTitleRow">
+            <div class="cardTitle">タグ設定</div>
+            <span id="dupKeyMsg" class="errInline" aria-live="polite"></span>
+          </div>
+          <div class="cardActions">
+            <button id="btnResetTags" class="btn btnResetAction" tabindex="-1">Reset Tags</button>
+          </div>
+        </div>
+
+        <div class="tagWrap">
+          <div class="tagTableWrap">
+            <div id="tagTables" class="tagTables" aria-label="タグ設定"></div>
+          </div>
         </div>
       </section>
 
-      <section class="card tableCard">
+      <section class="card rankCard">
         <div class="cardHead">
-          <div class="cardTitle">順位表</div>
+          <div class="cardTitleRow">
+            <div class="cardTitle">順位入力</div>
+            <button id="btnPin" class="btn btnPressAction" tabindex="-1">タグ固定</button>
+          </div>
+          <div class="cardActions resetActionStack">
+            <button id="btnResetAll" class="btn btnResetAction" tabindex="-1">Reset</button>
+            <button id="btnRecovery" class="btn btnRecovery btnResetAction" tabindex="-1" disabled>Recovery</button>
+          </div>
         </div>
-        <div class="tableScroll xScroll">
-          <table id="tblRank" class="tbl"></table>
+
+        <div class="pinRow">
+          <div id="pinPreview" class="pinPreview" aria-label="タグ見本"></div>
         </div>
+
+        <div class="smallLine smallLineTight">
+          <span>1レース最大点差：<span id="spMaxDiff">--</span>点</span>
+        </div>
+
+        <div id="rankWrap" class="rankWrap"></div>
       </section>
 
-      <section class="card tagCard">
-        <div class="cardHead">
-          <div class="cardTitle">チーム/個人設定</div>
+      <section class="card cardLast resultCard">
+        <div class="cardHead resultMainHead">
+          <div class="cardTitleRow">
+            <div class="cardTitle">集計結果</div>
+            <button id="btnCopyMain" class="btn btnCopyAction" tabindex="-1">copy</button>
+            <span id="copyStatusMsg" class="copyStatusMsg" aria-live="polite"></span>
+          </div>
         </div>
-        <div class="tableScroll">
-          <table id="tblTag" class="tbl"></table>
-        </div>
-      </section>
 
-      <section class="card resultCard">
-        <div class="cardHead">
-          <div class="cardTitle">出力</div>
+        <div class="resultMainPlain">
+          <div class="copyLine">
+            <div id="outMain" class="outLine outWrap" title="コピペ用"></div>
+          </div>
+
+          <div class="optionRow">
+            <div class="optTitle">表示オプション</div>
+            <div class="displayOptionBlock">
+              <div class="displayOptionLine">
+                <label class="radio"><input type="radio" name="dispMode" value="normal" checked>点差のみ</label>
+                <label class="chk"><input id="chkShowSum" type="checkbox">合計点</label>
+                <label class="chk"><input id="chkShowCert" type="checkbox">勝ち確表示</label>
+                <span id="certText" class="certText"></span>
+              </div>
+              <div class="displayOptionLine">
+                <label class="radio"><input type="radio" name="dispMode" value="sumOnly">合計点のみ(順位計算なし)</label>
+              </div>
+            </div>
+          </div>
         </div>
-        
+
+        <div class="divider"></div>
+
         <div class="resultGroup resultGroupOther">
-        <div class="copyLine">
-          <div class="optTitle">通常出力</div>
-          <button id="btnCopyText" class="btn btnCopyAction" tabindex="-1">copy</button>
-        </div>
-        <div class="copyLine">
-          <div id="outText" class="outLine outWrap"></div>
-        </div>
-
-        <div class="copyLine">
-          <div class="optTitle">個人のみ出力</div>
-          <button id="btnCopyIndiv" class="btn btnCopyAction" tabindex="-1">copy</button>
-        </div>
-        <div class="copyLine">
-          <div id="outIndiv" class="outLine outWrap"></div>
-        </div>
-
-        <div class="copyLine">
-          <div class="optTitle">個別視点出力</div>
+        <div class="optionRow">
+          <div class="optTitle">他チームの集計結果</div>
           <button id="btnCopyOpt" class="btn btnCopyAction" tabindex="-1">copy</button>
           <select id="selView" class="sel"></select>
         </div>
@@ -152,17 +174,7 @@
         <button id="btnSpecClose" class="pinClose" aria-label="閉じる" tabindex="-1">×</button>
       </div>
       <div class="modalBody">
-        <p><strong>■ 概要</strong><br>
-        本サイトは、マリオカートの各種対戦形式（形式に応じて自動で補正ロジックが適用されます）におけるレースごとの順位入力、チーム・個人の点数計算、および進行用のテキスト出力を即座に行うための集計ツールです。</p>
-        <p><strong>■ 基本操作</strong><br>
-        1. <strong>ルール設定:</strong> 対戦人数、対戦形式、総レース数を選択します。<br>
-        2. <strong>名前・チーム設定:</strong> 下部の「チーム/個人設定」で各プレイヤーの「名前」の入力および「チーム（色）」の選択を行います。<br>
-        3. <strong>順位の入力:</strong> 「順位表」の各レース列（R1〜）のセルをクリックすると、順位をトグル入力、または直接数値を入力できます。未入力状態のセルは自動的に残りの順位が補完・計算されます。<br>
-        4. <strong>テキストの出力とコピー:</strong> 最下部の出力エリアに、現在の集計状況に応じた進捗テキストがリアルタイムに生成されます。「copy」ボタンを押すことで、クリップボードに一発でコピーできます。</p>
-        <p><strong>■ 特殊機能</strong><br>
-        ・<strong>ピン留め表示:</strong> 「ピン留め表示」ボタンを押すと、画面上部または下部に現在の総合順位のミニプレビューが固定され、画面をスクロールしても常に状況を確認できるようになります。<br>
-        ・<strong>進む・戻す (Undo/Redo):</strong> 入力ミスやルールの変更は、いつでも「戻す」「進む」ボタンで履歴を行き来できます。<br>
-        ・<strong>リアルタイム補正:</strong> 選択された対戦形式のルールに則り、未入力レースがある状態でも、現在の得点差や最大獲得可能点数から自動的に「補正点」がログへ算出されます。</p>
+        <div class="specText">準備中</div>
       </div>
     </div>
   </div>
