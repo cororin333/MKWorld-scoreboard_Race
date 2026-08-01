@@ -15,7 +15,6 @@
         <button id="btnSpec" class="pill btnPressAction" tabindex="-1">サイトの使い方</button>
       </div>
     </header>
-
     <main>
       <section class="card">
         <div class="cardHead">
@@ -38,7 +37,6 @@
               <label class="radio"><input type="radio" name="races" value="12" checked>12</label>
             </div>
           </div>
-
           <div class="ruleCol">
             <div class="ruleLine">
               <span class="label">通過組数</span>
@@ -54,7 +52,6 @@
           </div>
         </div>
       </section>
-
       <section class="card">
         <div class="cardHead">
           <div class="cardTitleRow">
@@ -65,14 +62,12 @@
             <button id="btnResetTags" class="btn btnResetAction" tabindex="-1">Reset Tags</button>
           </div>
         </div>
-
         <div class="tagWrap">
           <div class="tagTableWrap">
             <div id="tagTables" class="tagTables" aria-label="タグ設定"></div>
           </div>
         </div>
       </section>
-
       <section class="card rankCard">
         <div class="cardHead">
           <div class="cardTitleRow">
@@ -84,18 +79,14 @@
             <button id="btnRecovery" class="btn btnRecovery btnResetAction" tabindex="-1" disabled>Recovery</button>
           </div>
         </div>
-
         <div class="pinRow">
           <div id="pinPreview" class="pinPreview" aria-label="タグ見本"></div>
         </div>
-
         <div class="smallLine smallLineTight">
           <span>1レース最大点差：<span id="spMaxDiff">--</span>点</span>
         </div>
-
         <div id="rankWrap" class="rankWrap"></div>
       </section>
-
       <section class="card cardLast resultCard">
         <div class="cardHead resultMainHead">
           <div class="cardTitleRow">
@@ -104,12 +95,10 @@
             <span id="copyStatusMsg" class="copyStatusMsg" aria-live="polite"></span>
           </div>
         </div>
-
         <div class="resultMainPlain">
           <div class="copyLine">
             <div id="outMain" class="outLine outWrap" title="コピペ用"></div>
           </div>
-
           <div class="optionRow">
             <div class="optTitle">表示オプション</div>
             <div class="displayOptionBlock">
@@ -125,30 +114,23 @@
             </div>
           </div>
         </div>
-
         <div class="divider"></div>
-
         <div class="resultGroup resultGroupOther">
         <div class="optionRow">
           <div class="optTitle">他チームの集計結果</div>
           <button id="btnCopyOpt" class="btn btnCopyAction" tabindex="-1">copy</button>
           <select id="selView" class="sel"></select>
         </div>
-
         <div class="copyLine">
           <div id="outOpt" class="outLine outWrap"></div>
         </div>
-
         </div>
-
         <div class="divider"></div>
-
         <div class="resultGroup resultGroupLogs">
         <div class="logBlock">
           <div class="logTitle">点数補正ログ</div>
           <div id="logAdj" class="log"></div>
         </div>
-
         <div class="logBlock">
           <div class="logTitle">コース選択ログ</div>
           <label class="chk small"><input id="chkShowCourseLog" type="checkbox">表示</label>
@@ -158,14 +140,12 @@
       </section>
     </main>
   </div>
-
   <div id="pinBar" class="pinBar hidden" aria-hidden="true">
     <div class="pinBarInner">
       <div id="pinBarContent" class="pinBarContent"></div>
       <button id="btnPinClose" class="pinClose" aria-label="閉じる" tabindex="-1">×</button>
     </div>
   </div>
-
   <div id="modalSpec" class="modal hidden" aria-hidden="true">
     <div class="modalBack"></div>
     <div class="modalBox">
@@ -178,7 +158,6 @@
       </div>
     </div>
   </div>
-
   <script src="app.js"></script>
 </body>
 </html>
