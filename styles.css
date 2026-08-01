@@ -158,7 +158,6 @@ body{margin:0;font-family:var(--fontThin);font-size:14px;color:var(--text);backg
 .specText{font-size:12px;color:#000;font-family:var(--fontThin);}
 .copyStatusMsg.fail{color:#FE3C4F;}
 .btnCopyAction{transition:transform .1s ease;}
-
 /* latest consolidated layout */
 .card{padding-left:16px;padding-right:16px;}
 .resultGroup{background:#dcdcdc;border-radius:12px;padding:10px 12px;margin:10px 0;box-sizing:border-box;}
@@ -177,7 +176,6 @@ body{margin:0;font-family:var(--fontThin);font-size:14px;color:var(--text);backg
 .rankDisp{line-height:1;}
 .rankCell{display:flex;align-items:stretch;justify-content:stretch;}
 .rankKey,.rankDisp{line-height:1;}
-
 /* fixed layout adjustments */
 :root{
   --tagw:60px;
